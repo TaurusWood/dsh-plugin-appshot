@@ -1,8 +1,29 @@
 {
   "name": "dsh-plugin-appshot",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "dsh-plugin-appshot — a DeepSeek Harness plugin for macOS context screenshot capture.",
   "license": "MIT",
+  "author": "TaurusWood",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TaurusWood/dsh-plugin-appshot.git"
+  },
+  "homepage": "https://github.com/TaurusWood/dsh-plugin-appshot#readme",
+  "bugs": {
+    "url": "https://github.com/TaurusWood/dsh-plugin-appshot/issues"
+  },
+  "keywords": [
+    "deepseek",
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "appshot",
+    "screenshot",
+    "screencapturekit",
+    "macos",
+    "agent",
+    "context"
+  ],
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
