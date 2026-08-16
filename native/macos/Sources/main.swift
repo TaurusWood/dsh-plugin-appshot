@@ -295,10 +295,27 @@ final class DoubleCommandMonitor {
     }
 
     private var state: State = .idle
+    private var isCapturing = false
+    private var lastTriggerTime: TimeInterval = 0
+    private let cooldownDuration: TimeInterval = 1.0 // 1 秒触发冷却防抖
     private let onTrigger: () -> Void
 
     init(onTrigger: @escaping () -> Void) {
         self.onTrigger = onTrigger
+    }
+
+    private func tryTrigger() {
+        let now = Date().timeIntervalSince1970
+        guard !isCapturing && (now - lastTriggerTime >= cooldownDuration) else {
+            return
+        }
+        lastTriggerTime = now
+        isCapturing = true
+
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            defer { self?.isCapturing = false }
+            self?.onTrigger()
+        }
     }
 
     func handleFlagsChanged(event: NSEvent) {
@@ -313,7 +330,7 @@ final class DoubleCommandMonitor {
         case .idle:
             if isLeftDown && isRightDown {
                 state = .triggered
-                onTrigger()
+                tryTrigger()
             } else if isLeftDown {
                 state = .leftDown
             } else if isRightDown {
@@ -322,14 +339,14 @@ final class DoubleCommandMonitor {
         case .leftDown:
             if isLeftDown && isRightDown {
                 state = .triggered
-                onTrigger()
+                tryTrigger()
             } else if !isLeftDown {
                 state = isRightDown ? .rightDown : .idle
             }
         case .rightDown:
             if isLeftDown && isRightDown {
                 state = .triggered
-                onTrigger()
+                tryTrigger()
             } else if !isRightDown {
                 state = isLeftDown ? .leftDown : .idle
             }
