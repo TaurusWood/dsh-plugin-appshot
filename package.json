@@ -1,0 +1,38 @@
+{
+  "name": "dsh-plugin-appshot",
+  "version": "0.1.0",
+  "description": "dsh-plugin-appshot — a DeepSeek Harness plugin (tool template).",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "cordis.patch.yml"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "scripts": {
+    "build": "npx esbuild src/index.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/index.js",
+    "build:native": "./native/macos/scripts/build-app.sh",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test --test-concurrency=1 \"tests/**/*.test.ts\"",
+    "test:typecheck": "tsc -p tsconfig.tests.json --noEmit"
+  },
+  "dependencies": {
+    "@deepseek-ai/dsh-tools": "0.1.0-rc.6"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@types/node": "^22.10.0",
+    "typescript": "^5.6.0"
+  }
+}

@@ -1,0 +1,38 @@
+# Node & Package Managers
+node_modules/
+dist/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Swift / macOS Native Build Artifacts
+.build/
+native/macos/.build/
+native/macos/appshot-macos
+.swiftpm/
+*.xcodeproj
+*.xcworkspace
+DerivedData/
+
+# Environment & Local Overrides
+.env
+.env.local
+.env.*.local
+
+# macOS System Files
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# IDE & Editor Files
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+*~
