@@ -24,7 +24,9 @@ dsh plugin --profile web add dsh-plugin-appshot
 
 ## What it is
 
-A DSH take on "[Codex Appshots](https://developers.openai.com/codex/appshots)": press **Left ⌘ + Right ⌘** in any app, and the plugin captures the **frontmost window** you are currently working in, then attaches it to the current session's composer draft automatically. Type your message, hit Send, and the screenshot travels with your text as a **single User Message** to the agent.
+A DSH take on "[Codex Appshots](https://developers.openai.com/codex/appshots)": brings global-shortcut context capture to DeepSeek Harness.
+
+**Typical scenario**: whenever you run into an issue or question in any app or window — whether inspecting a design, browsing docs, debugging code in your IDE, or troubleshooting terminal output — simply press **Left ⌘ + Right ⌘**. The screenshot of your current window is instantly transferred to the DSH client and attached to the composer draft; just type your question to ask the agent directly, eliminating the friction of manual capturing, app switching, and pasting.
 
 **It captures the "current window", not the "whole screen"** — matching Codex's own Appshots wording (*"An appshot captures the frontmost window only."*):
 
@@ -37,6 +39,23 @@ Press Left ⌘ + Right ⌘  →  capture frontmost window  →  image lands in c
 ```
 
 Currently supports **macOS 14+**; a **Windows version is in development**.
+
+## Usage
+
+1. In any app (Chrome, VS Code, Finder, Terminal…), **press Left ⌘ and Right ⌘ together** — you capture exactly the **one window** in front of you, not the whole screen.
+2. After the screenshot lands on disk, the DSH window is activated and focused (capture-then-activate — DSH can never appear in its own screenshot; window activation applies to the DSH desktop app only — under `dsh web` the image still lands in the composer, just without the window activation).
+
+| Before trigger (frontmost app window) | After trigger (captured & mounted into Composer) |
+| :---: | :---: |
+| ![Before trigger](docs/assets/before-double-command.png) | ![After trigger](docs/assets/after-double-command.png) |
+
+3. The screenshot is attached to the current session's composer draft (click to inspect in full view, or trigger again to append more).
+
+![Open Appshot in DSH Desktop](docs/assets/open-app-shot-in-dsh-desktop.png)
+
+4. Type a description (e.g. "analyze this error on screen") and hit Send — the screenshot is submitted together with your text.
+
+> The screenshot enters the composer rather than firing the agent directly — you stay in control: add context, append more shots, or remove attachments you don't need.
 
 ## Features
 
@@ -75,15 +94,6 @@ Key design points:
 
 - **No-self-capture hard constraint**: no module may activate/show/focus the DSH window before the screenshot is on disk; window activation is a native capability (`NSRunningApplication`), not a DSH API.
 - **Deterministic ownership transfer (Single Owner)**: the staging file belongs to the plugin until `saveImage` succeeds; ownership then moves to the DSH AttachmentStore and the plugin `unlink`s immediately; failure paths clean up in `finally`; orphan files are garbage-collected on startup.
-
-## Usage
-
-1. In any app (Chrome, VS Code, Finder, Terminal…), **press Left ⌘ and Right ⌘ together** — you capture exactly the **one window** in front of you, not the whole screen.
-2. After the screenshot lands on disk, the DSH window is activated and focused (capture-then-activate — DSH can never appear in its own screenshot; window activation applies to the DSH desktop app only — under `dsh web` the image still lands in the composer, just without the window activation).
-3. The screenshot is attached to the current session's composer draft (trigger again to append more).
-4. Type a description (e.g. "analyze this error on screen") and hit Send — the screenshot is submitted together with your text.
-
-> The screenshot enters the composer rather than firing the agent directly — you stay in control: add context, append more shots, or remove attachments you don't need.
 
 ## Permissions
 
@@ -131,4 +141,4 @@ Publishing: `pnpm publish` (`prepack` automatically runs `pnpm build && pnpm bui
 
 ## License
 
-MIT (a `LICENSE` file should be added before publishing)
+This project is licensed under the [MIT License](LICENSE).

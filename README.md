@@ -24,7 +24,9 @@ dsh plugin --profile web add dsh-plugin-appshot
 
 ## 这是什么
 
-DSH 版的「[Codex Appshots](https://developers.openai.com/codex/appshots)」：在任意应用中同时按下 **左 ⌘ + 右 ⌘**，插件截取**当前正在操作的前台窗口**（frontmost window），并自动挂载到当前会话的 Composer 草稿；输入描述、点击发送，截图与文本作为**同一条 User Message** 交给 Agent。
+DSH 版的「[Codex Appshots](https://developers.openai.com/codex/appshots)」：为 DeepSeek Harness 带来全局快捷截屏上下文体验。
+
+**典型场景**：无论你是在浏览器中查阅文档、在 IDE 中调试代码，还是在终端中排查报错——在任何应用的任何窗口中遇到疑问，只需按下 **左 ⌘ + 右 ⌘**，当前窗口截图便会瞬间自动传递到 DSH 客户端并挂入 Composer；附上你的问题即可直接向 Agent 提问，彻底告别「手动截图 → 切换窗口 → 粘贴上传」的繁琐流程。
 
 **截的是「当前窗口」，不是「整个屏幕」**——与 Codex 官方对 Appshots 的描述一致（*"An appshot captures the frontmost window only."*，Appshot 只截取最前面的那个窗口）：
 
@@ -37,6 +39,23 @@ DSH 版的「[Codex Appshots](https://developers.openai.com/codex/appshots)」�
 ```
 
 目前支持 **macOS 14+**；**Windows 版本正在开发中**。
+
+## 使用
+
+1. 在任意应用（Chrome、VS Code、Finder、Terminal…）中**同时按下左 ⌘ 与右 ⌘**——截的就是你眼前正在看的这**一个窗口**，不是整屏；
+2. 截图完成落盘后 DSH 窗口自动唤起并聚焦（先截后唤，不会截到 DSH 自身；窗口唤起仅对 DSH 桌面端生效，`dsh web` 下截图仍会挂入 Composer，只是不唤起窗口）；
+
+| 触发前（正在操作的前台窗口） | 触发后（自动截取并挂入 Composer） |
+| :---: | :---: |
+| ![触发前](docs/assets/before-double-command.png) | ![触发后](docs/assets/after-double-command.png) |
+
+3. 截图已挂载在当前会话 Composer 草稿中（可点击打开查看大图，或连续触发追加多张）；
+
+![在 DSH 桌面端查看 Appshot 截图](docs/assets/open-app-shot-in-dsh-desktop.png)
+
+4. 输入描述（如「分析当前界面上的这个报错」）后点击发送，截图随文本一起提交。
+
+> 截图进入 Composer 而非直接触发 Agent——你可以补充说明、追加截图或删除不需要的附件，意图完全由你掌控。
 
 ## 特性
 
@@ -75,15 +94,6 @@ DSH 版的「[Codex Appshots](https://developers.openai.com/codex/appshots)」�
 
 - **防自截硬约束**：任何模块在截图落盘前都禁止唤起/显示/聚焦 DSH 窗口；窗口唤起是 Native 能力（`NSRunningApplication`），不是 DSH API。
 - **确定性所有权转移（Single Owner）**：`saveImage` 成功前 Staging 文件归插件；成功后所有权移交 DSH AttachmentStore，插件立即 `unlink`；失败分支 `finally` 清理；启动时执行孤儿文件 GC。
-
-## 使用
-
-1. 在任意应用（Chrome、VS Code、Finder、Terminal…）中**同时按下左 ⌘ 与右 ⌘**——截的就是你眼前正在看的这**一个窗口**，不是整屏；
-2. 截图完成落盘后 DSH 窗口自动唤起并聚焦（先截后唤，不会截到 DSH 自身；窗口唤起仅对 DSH 桌面端生效，`dsh web` 下截图仍会挂入 Composer，只是不唤起窗口）；
-3. 截图已挂载在当前会话 Composer 草稿中（可连续触发追加多张）；
-4. 输入描述（如「分析当前界面上的这个报错」）后点击发送，截图随文本一起提交。
-
-> 截图进入 Composer 而非直接触发 Agent——你可以补充说明、追加截图或删除不需要的附件，意图完全由你掌控。
 
 ## 权限
 
@@ -131,4 +141,4 @@ swift build && .build/debug/appshot-macos --list-windows          # 列出可捕
 
 ## License
 
-MIT（发布前建议补一个 `LICENSE` 文件）
+本项目基于 [MIT](LICENSE) 协议开源。
