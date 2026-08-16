@@ -11,6 +11,8 @@ pnpm-debug.log*
 .build/
 native/macos/.build/
 native/macos/appshot-macos
+.module-cache/
+native/macos/.module-cache/
 .swiftpm/
 *.xcodeproj
 *.xcworkspace
