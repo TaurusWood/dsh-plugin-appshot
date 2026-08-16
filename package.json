@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "description": "dsh-plugin-appshot — a DeepSeek Harness plugin for macOS context screenshot capture.",
   "license": "MIT",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "exports": {
