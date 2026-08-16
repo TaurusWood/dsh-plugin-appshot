@@ -265,7 +265,7 @@ func performCapture(targetWindowId: UInt32? = nil, outputPath: String? = nil, ac
     return result
 }
 
-// MARK: - 双 Command 状态机 (DoubleCommandStateMachine)
+// MARK: - 双 Command 状态机 (DoubleCommandMonitor)
 
 final class DoubleCommandMonitor {
     enum State {
@@ -276,8 +276,6 @@ final class DoubleCommandMonitor {
     }
 
     private var state: State = .idle
-    private var isLeftDown = false
-    private var isRightDown = false
     private let onTrigger: () -> Void
 
     init(onTrigger: @escaping () -> Void) {
@@ -285,20 +283,12 @@ final class DoubleCommandMonitor {
     }
 
     func handleFlagsChanged(event: NSEvent) {
-        // macOS Command modifier flags:
-        // NX_DEVICELCMDKEYMASK = 0x00000008, NX_DEVICERCMDKEYMASK = 0x00000010 (device-dependent)
-        // 或按 keyCode 判定：Left Cmd = 55, Right Cmd = 54
-        let keyCode = event.keyCode
-        let isCommand = event.modifierFlags.contains(.command)
-
-        if keyCode == 55 { // Left Command
-            isLeftDown = isCommand
-        } else if keyCode == 54 { // Right Command
-            isRightDown = isCommand
-        } else if !isCommand {
-            isLeftDown = false
-            isRightDown = false
-        }
+        // macOS device-dependent modifier masks:
+        // NX_DEVICELCMDKEYMASK = 0x00000008 (bit 3: Left Command)
+        // NX_DEVICERCMDKEYMASK = 0x00000010 (bit 4: Right Command)
+        let raw = event.modifierFlags.rawValue
+        let isLeftDown = (raw & 0x08) != 0
+        let isRightDown = (raw & 0x10) != 0
 
         switch state {
         case .idle:
@@ -315,19 +305,23 @@ final class DoubleCommandMonitor {
                 state = .triggered
                 onTrigger()
             } else if !isLeftDown {
-                state = .idle
+                state = isRightDown ? .rightDown : .idle
             }
         case .rightDown:
             if isLeftDown && isRightDown {
                 state = .triggered
                 onTrigger()
             } else if !isRightDown {
-                state = .idle
+                state = isLeftDown ? .leftDown : .idle
             }
         case .triggered:
-            // 必须释放任意一个 Command 才能重置状态机
-            if !isLeftDown || !isRightDown {
-                state = isLeftDown ? .leftDown : (isRightDown ? .rightDown : .idle)
+            // 脱离双按状态后，才能重新装填 (re-arm) 状态机
+            if !isLeftDown && !isRightDown {
+                state = .idle
+            } else if isLeftDown && !isRightDown {
+                state = .leftDown
+            } else if !isLeftDown && isRightDown {
+                state = .rightDown
             }
         }
     }
