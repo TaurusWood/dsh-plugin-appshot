@@ -1,12 +1,15 @@
 {
   "name": "dsh-plugin-appshot",
   "version": "0.1.0",
-  "description": "dsh-plugin-appshot — a DeepSeek Harness plugin (tool template).",
+  "description": "dsh-plugin-appshot — a DeepSeek Harness plugin for macOS context screenshot capture.",
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
   "exports": {
-    ".": "./dist/index.js"
+    ".": "./dist/index.js",
+    "./client": "./dist/client.js",
+    "./package.json": "./package.json",
+    "./cordis.patch.yml": "./cordis.patch.yml"
   },
   "files": [
     "dist",
@@ -15,13 +18,20 @@
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-conversation"
+      ],
+      "immediately": false
     }
   },
   "scripts": {
-    "build": "npx esbuild src/index.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/index.js",
+    "build": "npx esbuild src/index.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/index.js && npx esbuild src/client.ts --bundle --platform=browser --format=cjs --banner:js=\"window.__ModuleLoader__.load({ id: 'dsh-plugin-appshot', factory: (require) => { var module = { exports: {} }; var exports = module.exports;\" --footer:js=\"return module.exports; } });\" --outfile=dist/client.js",
     "build:native": "./native/macos/scripts/build-app.sh",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --test --test-concurrency=1 \"tests/**/*.test.ts\"",
+    "test": "DSH_DISABLE_AGENT_SPAWN=1 node --test --test-concurrency=1 \"tests/**/*.test.ts\"",
     "test:typecheck": "tsc -p tsconfig.tests.json --noEmit"
   },
   "dependencies": {
