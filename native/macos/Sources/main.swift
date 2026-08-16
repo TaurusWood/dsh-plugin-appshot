@@ -159,11 +159,20 @@ func captureWindow(filter: SCContentFilter, config: SCStreamConfiguration) throw
     return try result!.get()
 }
 
+@discardableResult
+private func bringAppToFront(_ app: NSRunningApplication) -> Bool {
+    if #available(macOS 14.0, *) {
+        return app.activate()
+    } else {
+        return app.activate(options: [.activateIgnoringOtherApps, .activateAllWindows])
+    }
+}
+
 func activateApplication(bundleIdentifier: String? = nil, pid: pid_t? = nil) -> Bool {
     // 1. 优先根据 PID 激活 (直接激活拉起 Agent 的宿主进程)
     if let targetPid = pid, targetPid > 0 {
         if let app = NSRunningApplication(processIdentifier: targetPid) {
-            if app.activate(options: [.activateIgnoringOtherApps, .activateAllWindows]) {
+            if bringAppToFront(app) {
                 return true
             }
         }
@@ -180,7 +189,7 @@ func activateApplication(bundleIdentifier: String? = nil, pid: pid_t? = nil) -> 
     for bundleId in candidateBundleIds {
         let runningApps = NSRunningApplication.runningApplications(withBundleIdentifier: bundleId)
         if let targetApp = runningApps.first {
-            if targetApp.activate(options: [.activateIgnoringOtherApps, .activateAllWindows]) {
+            if bringAppToFront(targetApp) {
                 return true
             }
         }
@@ -189,7 +198,7 @@ func activateApplication(bundleIdentifier: String? = nil, pid: pid_t? = nil) -> 
     // 3. 按进程名称匹配 DeepSeek 相关应用
     for app in NSWorkspace.shared.runningApplications {
         if let name = app.localizedName, (name.localizedCaseInsensitiveContains("deepseek") || name.localizedCaseInsensitiveContains("dsh")) {
-            if app.activate(options: [.activateIgnoringOtherApps, .activateAllWindows]) {
+            if bringAppToFront(app) {
                 return true
             }
         }
