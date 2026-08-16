@@ -44,6 +44,25 @@ struct WindowInfo: Encodable {
     let frame: [String: Double]
     let isOnScreen: Bool
     let layer: Int
+
+    enum CodingKeys: String, CodingKey {
+        case windowId, appName, pid, title, frame, isOnScreen, layer
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(windowId, forKey: .windowId)
+        try container.encode(appName, forKey: .appName)
+        try container.encode(pid, forKey: .pid)
+        if let title = title {
+            try container.encode(title, forKey: .title)
+        } else {
+            try container.encodeNil(forKey: .title)
+        }
+        try container.encode(frame, forKey: .frame)
+        try container.encode(isOnScreen, forKey: .isOnScreen)
+        try container.encode(layer, forKey: .layer)
+    }
 }
 
 func outputJSON<T: Encodable>(_ object: T) {
