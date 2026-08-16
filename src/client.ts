@@ -139,6 +139,9 @@ export function apply(ctx: AppshotClientCtx) {
       }
       console.log('[dsh-plugin-appshot:client] draft image mounted:', draft.id)
 
+      if (typeof window !== 'undefined') {
+        window.focus()
+      }
       const input = document.querySelector('textarea, [contenteditable="true"]') as HTMLElement | null
       input?.focus()
     } catch (err) {

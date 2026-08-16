@@ -62,9 +62,14 @@ export function apply(ctx: Context) {
     const binaryPath = resolveAgentBinaryPath()
     if (existsSync(binaryPath)) {
       console.log('[dsh-plugin-appshot] starting native agent from:', binaryPath)
+      const activatePid = process.ppid || process.pid
       startAgent({
         command: binaryPath,
-        args: ['--daemon', '--activate-app', 'com.deepseek-harness.desktop'],
+        args: [
+          '--daemon',
+          '--activate-pid', String(activatePid),
+          '--activate-app', 'com.deepseek-harness.desktop',
+        ],
         onEvent: async (event) => {
           if (event.type === 'ready') {
             console.log('[dsh-plugin-appshot] native agent ready, pid:', event.pid)

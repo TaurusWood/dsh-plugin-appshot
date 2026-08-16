@@ -159,17 +159,60 @@ func captureWindow(filter: SCContentFilter, config: SCStreamConfiguration) throw
     return try result!.get()
 }
 
-func activateApplication(bundleIdentifier: String) -> Bool {
-    let runningApps = NSRunningApplication.runningApplications(withBundleIdentifier: bundleIdentifier)
-    if let targetApp = runningApps.first {
-        return targetApp.activate(options: [.activateAllWindows])
+func activateApplication(bundleIdentifier: String? = nil, pid: pid_t? = nil) -> Bool {
+    // 1. 优先根据 PID 激活 (直接激活拉起 Agent 的宿主进程)
+    if let targetPid = pid, targetPid > 0 {
+        if let app = NSRunningApplication(processIdentifier: targetPid) {
+            if app.activate(options: [.activateIgnoringOtherApps, .activateAllWindows]) {
+                return true
+            }
+        }
     }
+
+    // 2. 根据候选 Bundle ID 激活
+    let candidateBundleIds = [
+        bundleIdentifier,
+        "com.deepseek-harness.desktop",
+        "com.deepseek.harness",
+        "com.electron.deepseek-harness"
+    ].compactMap { $0 }
+
+    for bundleId in candidateBundleIds {
+        let runningApps = NSRunningApplication.runningApplications(withBundleIdentifier: bundleId)
+        if let targetApp = runningApps.first {
+            if targetApp.activate(options: [.activateIgnoringOtherApps, .activateAllWindows]) {
+                return true
+            }
+        }
+    }
+
+    // 3. 按进程名称匹配 DeepSeek 相关应用
+    for app in NSWorkspace.shared.runningApplications {
+        if let name = app.localizedName, (name.localizedCaseInsensitiveContains("deepseek") || name.localizedCaseInsensitiveContains("dsh")) {
+            if app.activate(options: [.activateIgnoringOtherApps, .activateAllWindows]) {
+                return true
+            }
+        }
+    }
+
+    // 4. AppleScript 强力唤起置顶兜底
+    if let bid = bundleIdentifier ?? candidateBundleIds.first {
+        let scriptSource = "tell application id \"\(bid)\" to activate"
+        if let script = NSAppleScript(source: scriptSource) {
+            var errorDict: NSDictionary?
+            script.executeAndReturnError(&errorDict)
+            if errorDict == nil {
+                return true
+            }
+        }
+    }
+
     return false
 }
 
 // MARK: - 核心截图执行器
 
-func performCapture(targetWindowId: UInt32? = nil, outputPath: String? = nil, activateAppId: String? = nil) -> AppshotSuccessResult? {
+func performCapture(targetWindowId: UInt32? = nil, outputPath: String? = nil, activateAppId: String? = nil, activatePid: pid_t? = nil) -> AppshotSuccessResult? {
     guard checkScreenCapturePermission() else {
         outputJSON(AppshotErrorResult(code: "SCREEN_PERMISSION_DENIED", message: "Screen capture permission is required."))
         return nil
@@ -266,10 +309,8 @@ func performCapture(targetWindowId: UInt32? = nil, outputPath: String? = nil, ac
         return nil
     }
 
-    // 先截后唤硬约束：落盘后激活目标 DSH App
-    if let bundleId = activateAppId {
-        _ = activateApplication(bundleIdentifier: bundleId)
-    }
+    // 先截后唤硬约束：落盘后激活目标 DSH App（置顶聚焦）
+    _ = activateApplication(bundleIdentifier: activateAppId, pid: activatePid)
 
     let result = AppshotSuccessResult(
         appName: targetAppName,
@@ -418,13 +459,18 @@ struct AppshotCLI {
             let bundleId = Bundle.main.bundleIdentifier ?? "com.deepseek-harness.appshot-agent"
             outputJSON(AppshotReadyFrame(pid: pid, bundleId: bundleId))
 
-            var targetActivateApp = "com.deepseek-harness.desktop"
+            var targetActivateApp: String? = "com.deepseek-harness.desktop"
             if let actIndex = args.firstIndex(of: "--activate-app"), actIndex + 1 < args.count {
                 targetActivateApp = args[actIndex + 1]
             }
 
+            var targetActivatePid: pid_t? = nil
+            if let pidIndex = args.firstIndex(of: "--activate-pid"), pidIndex + 1 < args.count {
+                targetActivatePid = pid_t(args[pidIndex + 1])
+            }
+
             let monitor = DoubleCommandMonitor {
-                if let result = performCapture(activateAppId: targetActivateApp) {
+                if let result = performCapture(activateAppId: targetActivateApp, activatePid: targetActivatePid) {
                     outputJSON(result)
                 }
             }
@@ -458,7 +504,12 @@ struct AppshotCLI {
             activateAppId = args[actIndex + 1]
         }
 
-        if let result = performCapture(targetWindowId: targetWindowId, outputPath: outputPath, activateAppId: activateAppId) {
+        var activatePid: pid_t? = nil
+        if let pidIndex = args.firstIndex(of: "--activate-pid"), pidIndex + 1 < args.count {
+            activatePid = pid_t(args[pidIndex + 1])
+        }
+
+        if let result = performCapture(targetWindowId: targetWindowId, outputPath: outputPath, activateAppId: activateAppId, activatePid: activatePid) {
             outputJSON(result)
             exit(0)
         } else {
