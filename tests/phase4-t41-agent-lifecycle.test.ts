@@ -84,3 +84,40 @@ test('命令不存在：启动失败并拒绝（常规边界）', { skip: skipRe
   const { startAgent } = await import('../src/agent.ts')
   await assert.rejects(startAgent({ command: '/nonexistent/appshot-agent' }))
 })
+
+test('缺少执行权限：自动修复权限并成功启动（自愈边界）', { skip: skipReason }, async () => {
+  const { startAgent } = await import('../src/agent.ts')
+  const { writeFileSync, chmodSync, unlinkSync, statSync } = await import('node:fs')
+  const { join } = await import('node:path')
+  const { tmpdir } = await import('node:os')
+
+  const scriptPath = join(tmpdir(), `fake-agent-${Date.now()}.sh`)
+  writeFileSync(
+    scriptPath,
+    `#!/bin/sh\necho '{"type":"ready","version":1,"pid":'$$'}'\nwhile true; do sleep 1; done\n`,
+    { mode: 0o644 },
+  )
+  chmodSync(scriptPath, 0o644)
+
+  try {
+    const events: unknown[] = []
+    const agent = await startAgent({
+      command: scriptPath,
+      onEvent: (event: unknown) => events.push(event),
+    })
+
+    assert.ok(agent.pid > 0)
+    assert.equal(events.length, 1)
+    assert.equal((events[0] as { type?: string }).type, 'ready')
+
+    const stats = statSync(scriptPath)
+    assert.notEqual(stats.mode & 0o111, 0, '文件权限应已被修复为具有执行权限')
+
+    await agent.stop()
+  } finally {
+    try {
+      unlinkSync(scriptPath)
+    } catch {}
+  }
+})
+

@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess } from 'node:child_process'
+import { chmodSync, statSync } from 'node:fs'
 import { createNdjsonParser } from './ipc.ts'
 import type { AppshotEvent } from './types.ts'
 
@@ -16,7 +17,20 @@ export interface AgentProcess {
   wait(): Promise<number | null>
 }
 
+export function ensureExecutable(filePath: string): void {
+  try {
+    const stats = statSync(filePath)
+    // 如果缺少任何执行权限位 (0o111)，自动赋予执行权限 (0o755)
+    if ((stats.mode & 0o111) === 0) {
+      chmodSync(filePath, (stats.mode & 0o777) | 0o755)
+    }
+  } catch {
+    // 忽略错误，文件不存在等异常交由 spawn / 上层统一处理
+  }
+}
+
 export async function startAgent(options: StartAgentOptions): Promise<AgentProcess> {
+  ensureExecutable(options.command)
   const readyTimeoutMs = options.readyTimeoutMs ?? 3000
 
   return new Promise<AgentProcess>((resolve, reject) => {

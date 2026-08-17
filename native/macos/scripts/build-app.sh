@@ -24,6 +24,7 @@ swiftc -O -parse-as-library \
     -framework ImageIO \
     -framework UniformTypeIdentifiers \
     -module-cache-path "${CACHE_DIR}"
+chmod 755 "${MACOS_DIR}/appshot-macos"
 
 echo "[build-app] 3. Copying Info.plist..."
 cp "${ROOT_DIR}/Resources/Info.plist" "${CONTENTS_DIR}/Info.plist"
