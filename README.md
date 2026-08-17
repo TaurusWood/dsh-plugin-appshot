@@ -2,7 +2,7 @@
 
 > macOS 全局快捷键「一键截图**当前窗口**」，自动作为图片上下文挂入 DeepSeek Harness (DSH) 的 Composer —— 把当前工作窗口零摩擦交给 Agent。
 
-[English](README.en.md) · [中文](README.md)
+[English](README.en.md) · [中文](README.md) · [Changelog](CHANGELOG.md) · [更新日志](CHANGELOG.zh-CN.md)
 
 ![macOS](https://img.shields.io/badge/macOS-14%2B-333333?logo=apple&logoColor=white)
 ![Windows](https://img.shields.io/badge/Windows-%E5%BC%80%E5%8F%91%E4%B8%AD-9cf)

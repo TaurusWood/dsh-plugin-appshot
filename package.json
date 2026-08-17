@@ -39,6 +39,8 @@
   "files": [
     "dist",
     "cordis.patch.yml",
+    "CHANGELOG.md",
+    "CHANGELOG.zh-CN.md",
     "native/macos/.build/Appshot Agent.app"
   ],
   "dsh": {
