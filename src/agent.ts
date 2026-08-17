@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { chmodSync, statSync } from 'node:fs'
 import { createNdjsonParser } from './ipc.ts'
-import type { AppshotEvent } from './types.ts'
+import type { AppshotConfig, AppshotEvent } from './types.ts'
 
 export interface StartAgentOptions {
   command: string
@@ -15,6 +15,7 @@ export interface AgentProcess {
   pid: number
   stop(): Promise<void>
   wait(): Promise<number | null>
+  sendConfig(config: AppshotConfig): void
 }
 
 export function ensureExecutable(filePath: string): void {
@@ -85,6 +86,14 @@ export async function startAgent(options: StartAgentOptions): Promise<AgentProce
         return new Promise<number | null>((res) => {
           exitPromises.push(res)
         })
+      },
+      sendConfig: (config: AppshotConfig) => {
+        if (hasExited || !child.stdin || !child.stdin.writable) return
+        const frame = JSON.stringify({
+          type: 'config/update',
+          payload: config,
+        }) + '\n'
+        child.stdin.write(frame)
       },
     })
 

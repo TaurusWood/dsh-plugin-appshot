@@ -36,6 +36,12 @@ export interface AppshotEventCapture {
   timestamp?: number
 }
 
+export interface AppshotConfig {
+  shortcutMode?: 'double-cmd' | 'double-option' | 'double-control' | 'cmd-option'
+  soundEnabled?: boolean
+  animationEnabled?: boolean
+}
+
 export interface AppshotEventError {
   type: 'error'
   id?: string
