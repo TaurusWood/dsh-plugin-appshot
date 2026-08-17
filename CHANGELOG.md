@@ -2,6 +2,16 @@
 
 [English](./CHANGELOG.md) | [简体中文](./CHANGELOG.zh-CN.md)
 
+# [0.2.0](https://github.com/TaurusWood/dsh-plugin-appshot/compare/v0.1.2...v0.2.0) (2026-08-17)
+
+
+### Features
+
+* **client:** implement settings panel and register into DSH settings slot ([9d3b7cc](https://github.com/TaurusWood/dsh-plugin-appshot/commit/9d3b7cce892f6618b189a7128cb8f6d7f1515be5))
+* **host:** add config models, settings sync, and REST endpoints ([bc7abe0](https://github.com/TaurusWood/dsh-plugin-appshot/commit/bc7abe0a71dd3698b5b88f513eb7776e5ae455da))
+* **native:** add capture sound, animation, and configurable shortcut monitor ([89fadd7](https://github.com/TaurusWood/dsh-plugin-appshot/commit/89fadd7c9d58373d5c97c17ac38819a49d40906e))
+* **release:** support bilingual changelog (EN / zh-CN) ([58006ca](https://github.com/TaurusWood/dsh-plugin-appshot/commit/58006cad275d306217ee47c1fdd1766b73689d6c))
+
 ## [0.1.2](https://github.com/TaurusWood/dsh-plugin-appshot/compare/v0.1.1...v0.1.2) (2026-08-17)
 
 
