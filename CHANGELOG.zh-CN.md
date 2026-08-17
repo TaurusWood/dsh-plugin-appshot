@@ -1,11 +1,11 @@
-# Changelog
+# 更新日志
 
 [English](./CHANGELOG.md) | [简体中文](./CHANGELOG.zh-CN.md)
 
 ## [0.1.2](https://github.com/TaurusWood/dsh-plugin-appshot/compare/v0.1.1...v0.1.2) (2026-08-17)
 
 
-### Bug Fixes
+### 🐛 问题修复 (Bug Fixes)
 
 * **agent:** ensure native binary has executable permissions before spawn ([02bf4e6](https://github.com/TaurusWood/dsh-plugin-appshot/commit/02bf4e6c7fc9cb54e3c558680ef5aa6ea2da3b9b))
 
@@ -14,14 +14,14 @@
 # [0.1.0](https://github.com/TaurusWood/dsh-plugin-appshot/compare/43b5bef2ebdaf4a6afd1c6cfe68ba6bb02561f42...v0.1.0) (2026-08-16)
 
 
-### Bug Fixes
+### 🐛 问题修复 (Bug Fixes)
 
 * **native:** explicitly encode null window title for json compatibility ([d67bc5e](https://github.com/TaurusWood/dsh-plugin-appshot/commit/d67bc5eb0dc908ef6656a0d95f852d98f6e1a2e2))
 * **native:** resolve activateIgnoringOtherApps deprecation on macOS 14+ ([9758613](https://github.com/TaurusWood/dsh-plugin-appshot/commit/9758613d8bbacf880393ea94ed8f8b45f38fd163))
 * **native:** use device-dependent modifier masks for double-command detection ([99b1d72](https://github.com/TaurusWood/dsh-plugin-appshot/commit/99b1d72f09351fb1a586c2943ae32a65ea646f92))
 
 
-### Features
+### 🚀 新特性 (Features)
 
 * **client:** decode image bytes from sse frame and mount to composer draft ([6356c15](https://github.com/TaurusWood/dsh-plugin-appshot/commit/6356c152329bdc524002537376259f211cfbfe71))
 * **client:** 实现客户端模块 SSE 消费、Composer 挂载与防自截全链路验证 (Phase 5 T5.1/T5.2) ([3b709b0](https://github.com/TaurusWood/dsh-plugin-appshot/commit/3b709b02f0a942b1c94f328a8972cd40b360852b))
