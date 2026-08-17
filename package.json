@@ -48,6 +48,7 @@
     "client": {
       "platform": "web",
       "inject": [
+        "@deepseek-ai/dsh-client-ui-slots",
         "@deepseek-ai/dsh-client-ui-conversation"
       ],
       "immediately": false
@@ -55,7 +56,7 @@
   },
   "scripts": {
     "prepack": "pnpm build && pnpm build:native",
-    "build": "npx esbuild src/index.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/index.js && npx esbuild src/client.ts --bundle --platform=browser --format=cjs --banner:js=\"window.__ModuleLoader__.load({ id: 'dsh-plugin-appshot', factory: (require) => { var module = { exports: {} }; var exports = module.exports;\" --footer:js=\"return module.exports; } });\" --outfile=dist/client.js",
+    "build": "npx esbuild src/index.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/index.js && npx esbuild src/client.ts --bundle --platform=browser --format=cjs --external:react --external:react-dom --external:react/jsx-runtime --banner:js=\"window.__ModuleLoader__.load({ id: 'dsh-plugin-appshot', factory: (require) => { var module = { exports: {} }; var exports = module.exports;\" --footer:js=\"return module.exports; } });\" --outfile=dist/client.js",
     "build:native": "./native/macos/scripts/build-app.sh",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "DSH_DISABLE_AGENT_SPAWN=1 node --test --test-concurrency=1 \"tests/**/*.test.ts\"",
@@ -68,6 +69,10 @@
   "devDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",
     "@types/node": "^22.10.0",
+    "@types/react": "^18.3.31",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
     "typescript": "^5.6.0"
-  }
+  },
+  "packageManager": "pnpm@11.22.0+sha512.1ff870c4c6133dfd88fb2afc46dd13d47f09c9794b438c6fdb47ca98caf3bc16381ee0be93a091b8e3824cf01f889f46d7d9e20910fb0be1ab0fb5baa80dd621"
 }
