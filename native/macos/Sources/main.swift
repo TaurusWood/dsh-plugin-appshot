@@ -4,6 +4,7 @@ import ScreenCaptureKit
 import CoreGraphics
 import ImageIO
 import UniformTypeIdentifiers
+import AudioToolbox
 
 // MARK: - NDJSON 契约模型
 
@@ -62,6 +63,41 @@ struct WindowInfo: Encodable {
         try container.encode(frame, forKey: .frame)
         try container.encode(isOnScreen, forKey: .isOnScreen)
         try container.encode(layer, forKey: .layer)
+    }
+}
+
+// MARK: - 动态配置模型 (Inbound JSON)
+
+struct ConfigPayload: Decodable {
+    let shortcutMode: String?
+    let soundEnabled: Bool?
+    let animationEnabled: Bool?
+}
+
+struct InboundCommand: Decodable {
+    let type: String
+    let payload: ConfigPayload?
+}
+
+final class AppConfig {
+    static let shared = AppConfig()
+
+    var soundEnabled: Bool = true
+    var animationEnabled: Bool = true
+    var shortcutMode: String = "double-cmd" // "double-cmd", "double-option", "double-control", "cmd-option"
+
+    private init() {}
+
+    func update(with payload: ConfigPayload) {
+        if let sound = payload.soundEnabled {
+            self.soundEnabled = sound
+        }
+        if let anim = payload.animationEnabled {
+            self.animationEnabled = anim
+        }
+        if let shortcut = payload.shortcutMode {
+            self.shortcutMode = shortcut
+        }
     }
 }
 
@@ -157,6 +193,104 @@ func captureWindow(filter: SCContentFilter, config: SCStreamConfiguration) throw
 
     _ = semaphore.wait(timeout: .distantFuture)
     return try result!.get()
+}
+
+// MARK: - 音效与动画辅助
+
+/// 持有正在播放的 NSSound 实例，防止 ARC 在播放完成前释放
+private var _activeSoundRef: NSSound?
+
+func playCaptureSound() {
+    guard AppConfig.shared.soundEnabled else { return }
+    DispatchQueue.main.async {
+        // 1. 优先加载系统音效文件（Tink = 清脆短促，适合截图反馈）
+        let systemSoundPath = "/System/Library/Sounds/Tink.aiff"
+        if FileManager.default.fileExists(atPath: systemSoundPath),
+           let sound = NSSound(contentsOfFile: systemSoundPath, byReference: true) {
+            _activeSoundRef = sound
+            sound.play()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                _activeSoundRef = nil
+            }
+            return
+        }
+        // 2. 回退到 NSSound named（Pop 在多数 macOS 版本存在）
+        if let sound = NSSound(named: NSSound.Name("Pop")) {
+            _activeSoundRef = sound
+            sound.play()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                _activeSoundRef = nil
+            }
+            return
+        }
+        // 3. 最低限度兜底
+        NSSound.beep()
+    }
+}
+
+final class CaptureOverlayWindow: NSWindow {
+    init(targetRect: CGRect) {
+        super.init(
+            contentRect: targetRect,
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        self.level = .floating
+        self.isOpaque = false
+        self.hasShadow = false
+        self.backgroundColor = NSColor.white.withAlphaComponent(0.4)
+        self.ignoresMouseEvents = true
+        self.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
+    }
+}
+
+/// 强引用正在执行动画的 overlay window，防止 ARC 在动画回调前释放导致 SIGSEGV
+final class OverlayManager {
+    static let shared = OverlayManager()
+    private var activeOverlays: [CaptureOverlayWindow] = []
+    private init() {}
+
+    func track(_ overlay: CaptureOverlayWindow) {
+        activeOverlays.append(overlay)
+    }
+
+    func release(_ overlay: CaptureOverlayWindow) {
+        overlay.orderOut(nil)
+        activeOverlays.removeAll { $0 === overlay }
+    }
+}
+
+func showCaptureAnimation(for scFrame: CGRect) {
+    guard AppConfig.shared.animationEnabled else { return }
+    DispatchQueue.main.async {
+        guard let mainScreen = NSScreen.main else { return }
+        let primaryHeight = mainScreen.frame.height
+        // ScreenCaptureKit (左上原点) -> Cocoa (左下原点)
+        let cocoaY = primaryHeight - scFrame.origin.y - scFrame.size.height
+        let targetRect = CGRect(x: scFrame.origin.x, y: cocoaY, width: scFrame.size.width, height: scFrame.size.height)
+
+        let overlay = CaptureOverlayWindow(targetRect: targetRect)
+        OverlayManager.shared.track(overlay)
+        overlay.alphaValue = 0.0
+        overlay.orderFrontRegardless()
+
+        // Phase 1: 快速亮起白色闪光（60ms）
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = 0.06
+            context.timingFunction = CAMediaTimingFunction(name: .easeIn)
+            overlay.animator().alphaValue = 0.85
+        }, completionHandler: {
+            // Phase 2: 缓慢淡出（300ms）
+            NSAnimationContext.runAnimationGroup({ context in
+                context.duration = 0.3
+                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                overlay.animator().alphaValue = 0.0
+            }, completionHandler: {
+                OverlayManager.shared.release(overlay)
+            })
+        })
+    }
 }
 
 @discardableResult
@@ -318,7 +452,9 @@ func performCapture(targetWindowId: UInt32? = nil, outputPath: String? = nil, ac
         return nil
     }
 
-    // 先截后唤硬约束：落盘后激活目标 DSH App（置顶聚焦）
+    // 先截后唤与视觉/音效反馈（严格在落盘后触发，保障防自截）
+    playCaptureSound()
+    showCaptureAnimation(for: window.frame)
     _ = activateApplication(bundleIdentifier: activateAppId, pid: activatePid)
 
     let result = AppshotSuccessResult(
@@ -334,21 +470,18 @@ func performCapture(targetWindowId: UInt32? = nil, outputPath: String? = nil, ac
     return result
 }
 
-// MARK: - 双 Command 状态机 (DoubleCommandMonitor)
+// MARK: - 可配置快捷键状态机 (ConfigurableShortcutMonitor)
 
-final class DoubleCommandMonitor {
-    enum State {
-        case idle
-        case leftDown
-        case rightDown
-        case triggered
-    }
-
-    private var state: State = .idle
+final class ConfigurableShortcutMonitor {
     private var isCapturing = false
     private var lastTriggerTime: TimeInterval = 0
     private let cooldownDuration: TimeInterval = 1.0 // 1 秒触发冷却防抖
     private let onTrigger: () -> Void
+
+    // 双击连击检测
+    private var lastModifierPressTime: TimeInterval = 0
+    private var lastModifierType: String = ""
+    private var previousFlags: NSEvent.ModifierFlags = []
 
     init(onTrigger: @escaping () -> Void) {
         self.onTrigger = onTrigger
@@ -369,45 +502,107 @@ final class DoubleCommandMonitor {
     }
 
     func handleFlagsChanged(event: NSEvent) {
-        // macOS device-dependent modifier masks:
-        // NX_DEVICELCMDKEYMASK = 0x00000008 (bit 3: Left Command)
-        // NX_DEVICERCMDKEYMASK = 0x00000010 (bit 4: Right Command)
-        let raw = event.modifierFlags.rawValue
-        let isLeftDown = (raw & 0x08) != 0
-        let isRightDown = (raw & 0x10) != 0
+        let flags = event.modifierFlags
+        let raw = flags.rawValue
+        let now = Date().timeIntervalSince1970
+        let mode = AppConfig.shared.shortcutMode
 
-        switch state {
-        case .idle:
-            if isLeftDown && isRightDown {
-                state = .triggered
+        // 提取左右具体键位（利用 macOS raw 掩码）
+        // NX_DEVICELCMDKEYMASK = 0x08, NX_DEVICERCMDKEYMASK = 0x10
+        // NX_DEVICELALTKEYMASK = 0x20, NX_DEVICERALTKEYMASK = 0x40
+        let isLeftCmd = (raw & 0x08) != 0
+        let isRightCmd = (raw & 0x10) != 0
+        let isLeftOpt = (raw & 0x20) != 0
+        let isRightOpt = (raw & 0x40) != 0
+        let isCmd = flags.contains(.command)
+        let isOpt = flags.contains(.option)
+        let isCtrl = flags.contains(.control)
+
+        switch mode {
+        case "double-cmd":
+            // 左右 Cmd 同时按
+            if isLeftCmd && isRightCmd {
                 tryTrigger()
-            } else if isLeftDown {
-                state = .leftDown
-            } else if isRightDown {
-                state = .rightDown
+                previousFlags = flags
+                return
             }
-        case .leftDown:
-            if isLeftDown && isRightDown {
-                state = .triggered
+            // 或单 Cmd 快速双击 (Double Tap within 350ms)
+            if isCmd && !previousFlags.contains(.command) {
+                if lastModifierType == "cmd" && (now - lastModifierPressTime < 0.35) {
+                    tryTrigger()
+                    lastModifierPressTime = 0
+                } else {
+                    lastModifierPressTime = now
+                    lastModifierType = "cmd"
+                }
+            }
+
+        case "double-option":
+            if isLeftOpt && isRightOpt {
                 tryTrigger()
-            } else if !isLeftDown {
-                state = isRightDown ? .rightDown : .idle
+                previousFlags = flags
+                return
             }
-        case .rightDown:
-            if isLeftDown && isRightDown {
-                state = .triggered
+            if isOpt && !previousFlags.contains(.option) {
+                if lastModifierType == "opt" && (now - lastModifierPressTime < 0.35) {
+                    tryTrigger()
+                    lastModifierPressTime = 0
+                } else {
+                    lastModifierPressTime = now
+                    lastModifierType = "opt"
+                }
+            }
+
+        case "double-control":
+            if isCtrl && !previousFlags.contains(.control) {
+                if lastModifierType == "ctrl" && (now - lastModifierPressTime < 0.35) {
+                    tryTrigger()
+                    lastModifierPressTime = 0
+                } else {
+                    lastModifierPressTime = now
+                    lastModifierType = "ctrl"
+                }
+            }
+
+        case "cmd-option":
+            if isCmd && isOpt {
                 tryTrigger()
-            } else if !isRightDown {
-                state = isLeftDown ? .leftDown : .idle
+                previousFlags = flags
+                return
             }
-        case .triggered:
-            // 脱离双按状态后，才能重新装填 (re-arm) 状态机
-            if !isLeftDown && !isRightDown {
-                state = .idle
-            } else if isLeftDown && !isRightDown {
-                state = .leftDown
-            } else if !isLeftDown && isRightDown {
-                state = .rightDown
+
+        default:
+            if (isLeftCmd && isRightCmd) || (isCmd && !previousFlags.contains(.command) && lastModifierType == "cmd" && (now - lastModifierPressTime < 0.35)) {
+                tryTrigger()
+            }
+        }
+
+        previousFlags = flags
+    }
+}
+
+// MARK: - Stdin 监听器
+
+func startStdinListener() {
+    DispatchQueue.global(qos: .utility).async {
+        let input = FileHandle.standardInput
+        while true {
+            let data = input.availableData
+            guard !data.isEmpty else { break }
+            guard let text = String(data: data, encoding: .utf8) else { continue }
+            let lines = text.split(separator: "\n")
+            for line in lines {
+                let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else { continue }
+                if let lineData = trimmed.data(using: .utf8),
+                   let cmd = try? JSONDecoder().decode(InboundCommand.self, from: lineData) {
+                    if cmd.type == "config/update", let payload = cmd.payload {
+                        // 派发到主线程更新配置，避免与 NSEvent monitor 回调的并发竞态
+                        DispatchQueue.main.async {
+                            AppConfig.shared.update(with: payload)
+                        }
+                    }
+                }
             }
         }
     }
@@ -427,7 +622,7 @@ struct AppshotCLI {
             Usage: appshot-macos [options]
             Options:
               --cli-capture          Capture the current frontmost window (default)
-              --daemon               Run as persistent background agent with double-Command monitor
+              --daemon               Run as persistent background agent with configurable shortcut monitor
               --window-id <id>       Capture specific window by ID
               --list-windows         List all on-screen capturable windows
               --output <path>        Custom output PNG file path
@@ -478,7 +673,7 @@ struct AppshotCLI {
                 targetActivatePid = pid_t(args[pidIndex + 1])
             }
 
-            let monitor = DoubleCommandMonitor {
+            let monitor = ConfigurableShortcutMonitor {
                 if let result = performCapture(activateAppId: targetActivateApp, activatePid: targetActivatePid) {
                     outputJSON(result)
                 }
@@ -492,6 +687,9 @@ struct AppshotCLI {
                 monitor.handleFlagsChanged(event: event)
                 return event
             }
+
+            // 启动 stdin NDJSON 指令监听
+            startStdinListener()
 
             NSApp.run()
             exit(0)
