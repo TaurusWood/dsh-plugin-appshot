@@ -62,7 +62,7 @@
     "test": "DSH_DISABLE_AGENT_SPAWN=1 node --test --test-concurrency=1 \"tests/**/*.test.ts\"",
     "test:typecheck": "tsc -p tsconfig.tests.json --noEmit",
     "changelog": "node scripts/gen-changelog.mjs",
-    "release": "bumpp --commit \"chore: release v%s\" --tag \"v%s\" --push --execute \"pnpm run changelog && git add CHANGELOG.md CHANGELOG.zh-CN.md\""
+    "release": "pnpm run changelog && git add CHANGELOG.md CHANGELOG.zh-CN.md && bumpp --all --commit \"chore: release v%s\" --tag \"v%s\" --push"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",
