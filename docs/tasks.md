@@ -3,9 +3,9 @@
 ## 1. 拆分原则
 
 每个阶段满足：
-- 严格基于 DSH 真实 API（`ctx.attachments.saveImage` 字节输入、`ctx.webServer` SSE 通道、`dsh.client` 客户端模块）；
+- 严格基于 [`api-grounded-review.md`](api-grounded-review.md) 已核实的 DSH 接口；macOS 与 Windows 的传输和 Owner 合同分开验收；
 - 杜绝非官方推断接口（无 `lastActiveSessionId` 假设、无 `appshot:ready` 宿主转发假设、无 `desktopRuntime` 假设）；
-- 窗口唤起由 Native Agent 原生执行，严格遵守“先截后唤”时序与“单一 Owner”文件管理规则。
+- macOS 的窗口唤起由 Native Agent 执行并严格遵守“先截后唤”；Windows 不主动激活 DSH。两个平台都遵守单一 Owner 规则。
 
 整体实施路径：
 ```text
@@ -23,7 +23,7 @@ Phase 5: 客户端模块 (dsh.client) 与全链路闭环 (SSE 消费 + Draft 挂
   ↓
 Phase 6: 边界场景与鲁棒性验收
   ↓
-Phase 7: Windows 与后续增强 (Post-MVP)
+Phase W0-W5: Windows Basic（独立 Gate 与交付路径）
 ```
 
 ---
@@ -174,9 +174,59 @@ Phase 7: Windows 与后续增强 (Post-MVP)
 
 ---
 
-# Phase 7：Windows 与增强能力 (Post-MVP)
+# Windows Basic 实施路径
 
-- **T7.1 Windows Native Agent**（C# / `Windows.Graphics.Capture`）。
-- **T7.2 Accessibility 结构化文本提取**（`AXUIElement` / `UIAutomation`）。
-- **T7.3 区域框选与全屏截图模式**。
-- **T7.4 自定义快捷键配置面板**。
+> Windows 不是 macOS Phase 4/5 的换壳移植。产品合同以
+> [`requirements-windows.md`](requirements-windows.md) 为准，技术合同以
+> [`technical-windows.md`](technical-windows.md) 为准。下一阶段只能在当前 Gate 通过后开始。
+
+## W0 DSH 真机接口 Gate（阻断实施）
+
+- **目标**：在 Windows DSH Desktop 2.0.0 / `0.1.0-rc.6` 证明交付链的真实性。
+- **验证**：
+  - Renderer 可通过 `http://dsh.internal` 访问自建 POST 与长轮询路由；
+  - `sessions.binding`、`createDraftImages`、`addImages`、`removeImage`、`snapshot.imageIds`、`draftImages` 与 `releaseDraftImage` 行为符合证据文档；
+  - Client 插件 reload 与整个 Renderer reload 分别验证“活性检查后补 ACK”和“失效后重挂载”。
+- **通过标准**：
+  > 以真机 smoke 记录更新 `api-grounded-review.md`；任一关键接口不符合时停止，先重新设计交付层。
+
+## W1 Windows Native 触发、目标和通知
+
+- **目标**：实现左右 Ctrl 状态机、物理坐标锁定、单显示器校验与 No-Activate 通知。
+- **验证**：长按/重复键、注入事件、混合 DPI、跨屏、DSH/桌面/任务栏排除、通知不夺焦点且不拦截鼠标。
+- **通过标准**：
+  > 每次触发只产生一个候选 `captureId`；非法/跨屏目标在发送 `capture/request` 前本地失败。
+
+## W2 两阶段截图与 Staging 安全
+
+- **目标**：生成 visible backup，Node 接受后尝试普通置前，成功时截取新画面，失败时交付明确降级图。
+- **验证**：Topmost 遮挡、置前拒绝、置前后再次跨屏、8K/20MB 上限、PNG 原子落盘、路径/文件名/签名校验与孤儿 GC。
+- **通过标准**：
+  > 不使用 `HWND_TOPMOST`；截图落盘前不显示任何 UI；所有成功/失败分支无 Staging 残留。
+
+## W3 Node 状态机与定向传输
+
+- **目标**：实现 `IDLE / IN_FLIGHT / PENDING_ACK` 、Client+Session 锁定、安全 ingest、长轮询重放与串行状态转移。
+- **验证**：BUSY、15 秒 in-flight 超时、未知/取消 ID 迟到帧、两个 Client 同时轮询、Agent 在 `PENDING_ACK` 退出、dispose 和重复 ACK 元组。
+- **通过标准**：
+  > 同时最多一张 Pending；非目标 Client 无法读取图片；只有完整匹配的 `MOUNTED` 能释放 Pending。
+
+## W4 Client Draft 挂载、恢复与取消
+
+- **目标**：在锁定 Session 中创建/挂载 Draft，完成快速+低频持续恢复、无 Session 认领、活性验证和取消清理。
+- **验证**：Composer busy、Session 删除/改绑、长轮询断线、ACK 丢失、Client/Renderer reload、二次快捷键取消与 `MOUNTED` 竞态。
+- **通过标准**：
+  > 不调用 `window.focus()`；可验证已挂载状态不重复；不可判定的 mount/ACK 崩溃窗口按需求 §8.1 优先不丢图处理；取消先生效时从 Composer 和 Draft registry 一并清理，`MOUNTED` 先生效时不撤销已成功交付。
+
+## W5 跨平台包装配与真机验收
+
+- **目标**：macOS 与 Windows runner 分别生成 Native artifact，统一装配 npm 包。
+- **验证**：两个 Native 产物的包内存在性/可执行性、平台选择、安装/卸载、Windows 10/11 x64 与 macOS 基线回归。
+- **通过标准**：
+  > 只有双平台 build 和真机核心场景通过后才允许发布；单平台本地 `npm pack` 不是正式发布源。
+
+# 后续增强（非 Windows Basic）
+
+- Accessibility / UI Automation 结构化文本提取；
+- 区域框选、全屏截图或跨屏截图；
+- 自定义快捷键配置面板。
