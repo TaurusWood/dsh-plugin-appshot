@@ -1,5 +1,8 @@
 # dsh-plugin-appshot 技术方案
 
+> 本文仅覆盖 macOS 技术路径。Windows Basic 的 Native、HTTP 长轮询、Pending/ACK 和发布合同以
+> [`technical-windows.md`](technical-windows.md) 为准；DSH 接口真伪统一以 [`api-grounded-review.md`](api-grounded-review.md) 为准。
+
 ## 1. 架构目标
 
 在 DeepSeek Harness (DSH) 的 Node.js (^22.19.0 || >=24.0.0) / Cordis 插件体系中实现 macOS 桌面窗口上下文捕获。

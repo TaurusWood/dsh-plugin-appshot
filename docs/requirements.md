@@ -1,5 +1,8 @@
 # dsh-plugin-appshot PRD
 
+> 本文仅定义 macOS MVP。Windows Basic 不复制本文的窗口激活、SSE 或 Attachment Owner 合同，
+> 其产品边界以 [`requirements-windows.md`](requirements-windows.md) 为准。
+
 ## 1. 产品定义
 
 `dsh-plugin-appshot` 是 DeepSeek Harness (DSH) 的桌面上下文捕获插件。
@@ -43,7 +46,7 @@
 ### 后续规划（Non-goal in MVP）
 
 - WebUI 支持（WebUI 运行在浏览器 Tab 内，受浏览器沙箱限制无法获取全局系统快捷键与跨应用置顶，待后续结合 Browser Extension / 本地 WebSocket 探索）。
-- Windows 支持（Win32 / `Windows.Graphics.Capture`）。
+- Windows 实施（不属于本 macOS MVP；已单独定义 [`requirements-windows.md`](requirements-windows.md)）。
 - 辅助功能（Accessibility / UI Automation）结构化文本提取。
 - 手动区域框选截图（Region Shot）与全屏截图（Screen Shot）。
 - 自定义快捷键配置面板。

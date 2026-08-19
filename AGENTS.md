@@ -3,16 +3,19 @@
 本文件是 Coding Agent 的快速入口。它只保留高权重约束和导航；详细技术实现规则从
 [`docs/technical.md`](docs/technical.md) 进入，产品需求与边界从
 [`docs/requirements.md`](docs/requirements.md) 进入，分阶段实施计划从
-[`docs/tasks.md`](docs/tasks.md) 进入，\*\*DSH 接口依据核查（接口真伪的权威证据链）从
+[`docs/tasks.md`](docs/tasks.md) 进入，DSH 接口依据核查从
+[`docs/api-grounded-review.md`](docs/api-grounded-review.md) 进入。Windows Basic 单独以
+[`docs/requirements-windows.md`](docs/requirements-windows.md) 和
+[`docs/technical-windows.md`](docs/technical-windows.md) 为产品/技术权威文档。
 
 ## 项目概述
 
-`dsh-plugin-appshot` 是 DeepSeek Harness (DSH) 的 macOS 桌面上下文捕获插件：用户触发全局快捷键后，
-Native Agent 自动截取当前前台窗口，宿主插件将截图持久化为 Attachment 并经 SSE 推送给客户端模块，
-挂载到当前会话 Composer，随用户输入的文本一起作为同一条 User Message 提交给 Agent。
+`dsh-plugin-appshot` 是 DeepSeek Harness (DSH) 的桌面上下文捕获插件。当前 macOS 路径已有实现，
+Windows Basic 处于已闭合的规格/待实施状态。两个平台共用“截图进入 Composer Draft、不自动发送”的产品目标，
+但截图对象、窗口激活、传输和图片 Owner 合同按平台分开，不得交叉套用。
 运行环境对齐 DSH 宿主基线：Node.js **^22.19.0 || >=24.0.0**。
 
-系统由三方组成（职责边界见 `docs/technical.md` §2）：
+系统由 Native Agent、Node/Cordis 宿主插件和 DSH Client 模块三方组成：
 
 - **macOS Native Agent**（`native/macos`，Swift）：全局双 Command 状态机、前台窗口识别与过滤、
   ScreenCaptureKit 单窗口截图写 Staging 文件、截图落盘后原生唤起 DSH 主窗口（**先截后唤**）。
@@ -20,10 +23,13 @@ Native Agent 自动截取当前前台窗口，宿主插件将截图持久化为 
   `ctx.attachments.saveImage`、经 `ctx.webServer` 注册 SSE 通道广播、启动时孤儿 Staging 文件 GC。
 - **DSH Client 模块**（`dsh.client` / Renderer）：消费 SSE、维护 UI 活跃 `sessionId`、将
   `ImageAttachmentRef` 挂载到目标 Session 的 Composer Draft 并聚焦输入框。
+- **Windows Native Agent**（规划中，C# / Win32）：左右 Ctrl 触发、鼠标下窗口锁定、单显示器校验、
+  普通置前与可见内容降级截图，不激活 DSH。
+- **Windows Host/Client 交付**（规划中）：Node 在 ACK 前保留唯一内存 Pending 字节，通过定向 HTTP 长轮询
+  交给锁定 Client；Client 使用 runtime-only Draft API 挂载并返回 `MOUNTED`，Windows 不调用 `saveImage`。
 
-当前状态：`src/index.ts` 仍是脚手架 `defineTool` 模板，按 `docs/tasks.md` Phase 0 改造为
-生命周期插件（`inject = ['attachments', 'webServer', 'sessions']` + `apply`/`dispose`）；
-Native 端已具备 CLI 截图 PoC（`--cli-capture` / `--list-windows`）。
+当前状态：macOS Host/Client/Native 已有代码，其真实运行结果仍以当前测试与 DSH 验收为准；
+Windows 代码尚未实施，不得把 Windows 文档中的伪代码、协议或 Gate 描述成已完成功能。
 
 ## 工作原则
 
@@ -40,29 +46,23 @@ Native 端已具备 CLI 截图 PoC（`--cli-capture` / `--list-windows`）。
 
 ## 架构快速定向
 
-- 三方数据流：`Staging 文件 (Native)` → `字节 (Node fs.readFile)` → `ImageAttachmentRef (DSH)`
-  → `SSE 帧 (Node → Client 自建通道)` → `Composer Draft (Renderer)`。
-- **先截后唤（防自截）硬约束**：Native 截图完成并确认 Staging 文件写盘前，系统任何模块
-  绝对禁止唤起、显示或聚焦 DSH 窗口；窗口唤起是 Native 能力（`NSRunningApplication`），
-  不是 DSH API。
-- **确定性所有权转移（Single Owner）**：`saveImage` 成功前 Staging 文件归 Plugin；成功后所有权
-  移交 DSH AttachmentStore，Plugin 立即 `unlink`；失败分支 `finally` 清理；启动时执行
-  `cleanOrphanStagingFiles()`。
-- **DSH 真实接口面（核查结论）**：只有 `ctx.attachments`、`ctx.sessions`、`ctx.tools` 三个接口
-  真实存在；`lastActiveSessionId`、`appshot:ready` 事件桥、Composer 注入公共 API、
-  `desktopRuntime` 窗口方法均无依据，禁止使用。宿主 → 客户端事件转发是固定 allowlist，
-  插件 `ctx.emit` 任意事件不会到达 Renderer；推送只能走自建
-  `ctx.webServer.registerUpgrade()` SSE 通道。
+- **macOS 数据流**：`Staging` → Node 字节 → `ImageAttachmentRef` → 现有 SSE 通道 → Composer Draft。
+- **Windows 数据流**：`Staging` → Node 内存 Pending 字节 → 定向 HTTP 长轮询 → runtime-only Draft → `MOUNTED`。
+- **防自截**：macOS 仅能在截图落盘后原生唤起 DSH；Windows 截图落盘前不得显示通知，落盘后也不主动激活 DSH。
+- **DSH 真实接口面**：已核实 `ctx.webServer.register()` / `registerUpgrade()`、Client Session binding 和
+  Conversation runtime-only Draft API；具体基线与生命周期以 `docs/api-grounded-review.md` 为准。
+  `lastActiveSessionId`、自定义 Host 事件自动转发、`desktopRuntime` 窗口方法均无依据；
+  `ctx.emit` 的 appshot 事件不在固定 allowlist 中。
 
 ## 不可违反的硬规则
 
 1. 禁止 `any`、`@ts-ignore`；修复类型定义和调用边界。
-2. **防自截**：截图完成落盘前，禁止任何唤起、显示或聚焦 DSH 窗口的行为。
-3. **单一 Owner**：Staging 临时文件按"所有权原子转移"规则管理，任何成功/失败分支都不留残留。
+2. **防自截**：对已进入捕获的任务，截图完成落盘前禁止唤起、显示或聚焦 DSH，也禁止显示可进入画面的自有通知；前置校验确定不会继续截图后才可提示失败。
+3. **单一 Owner**：Staging 临时文件在所有成功/失败分支都必须清理；macOS 的最终 Owner 是 AttachmentStore，Windows 的 ACK 前 Owner 是 Node Pending、ACK 后是 Composer 运行时 Draft。
 4. 禁止使用 `docs/api-grounded-review.md` 判定为不存在的宿主接口
    （`lastActiveSessionId`、`appshot:ready` 事件桥、Composer 注入公共 API、`desktopRuntime` 窗口方法）。
-5. `ctx.attachments.saveImage` 的输入是**字节**（`Uint8Array`），不是文件路径；
-   `ImageAttachmentRef` 没有 `url` 字段。
+5. macOS 调用 `ctx.attachments.saveImage` 时输入必须是**字节**（`Uint8Array`），不是文件路径；
+   `ImageAttachmentRef` 没有 `url` 字段。Windows Basic 禁止调用 `saveImage`。
 6. 宿主侧不猜测"活跃会话"：只处理明确给定的 `sessionId`；活跃会话由客户端模块在 Renderer 侧
    识别并经自建通道上报。
 7. `@deepseek-ai/cordis` 是 peerDependency：代码中只允许 `import type`（编译期擦除），
@@ -76,17 +76,19 @@ Native 端已具备 CLI 截图 PoC（`--cli-capture` / `--list-windows`）。
 11. 加载顺序靠服务依赖（`inject`），不靠文件顺序；需要 `ctx.tools` / `attachments` / `webServer`
     等服务时必须显式声明 inject。
 12. `cordis.patch.yml` 的 `name` 是包名（走 node_modules 解析），不是相对路径。
+13. Windows Client 必须使用 `http://dsh.internal` 基址规则的绝对 URL 和普通 HTTP 长轮询，不得复制 macOS 的相对 EventSource/SSE 假设。
+14. `createDraftImages` 只是 Renderer runtime-only registry；未同时验证目标 Composer `imageIds` 和 Draft registry 时，不得仅凭本地 ID 补 ACK。
 
 ## 状态与数据边界
 
 - 数据与状态必须有唯一 owner；三方之间不维护需要双向同步的副本。
-- Staging 文件 owner 转移是原子的：Plugin（`saveImage` 成功前）→ DSH AttachmentStore
-  （成功后），转移点之外不存在并行 owner。
+- macOS：Staging 在 `saveImage` 成功前归 Plugin，成功后转移给 DSH AttachmentStore。
+- Windows：Staging 被读入后立即删除；`MOUNTED` 前 Node Pending 字节是唯一可重放副本，之后 Composer Draft 是最终运行时 Owner。
 - 活跃 Session 与 Composer Draft 是 Renderer 私有状态：宿主不持有、不猜测、不写入；
   客户端模块负责读取并上报 `sessionId`。
 - `ImageAttachmentRef` 是 DSH 的不透明持久化引用
   （`attachmentId` / `mediaType` / `bytes` / `width` / `height` / `name?`），不是路径、URL
-  或 base64；客户端取图走 `session.attachment` RPC（客户端侧读取路径）。
+  或 base64；该规则适用于 macOS Attachment 路径，Windows Basic 直接传递 Pending 字节，不创建此引用。
 
 ## 沟通与 CR
 
@@ -115,23 +117,23 @@ dsh --profile my-profile                        # 观察 "[dsh-plugin-appshot] r
 
 ## 目录与依赖速查
 
-- `src/`：宿主插件源码；`index.ts` 是 Cordis `apply(ctx)` 入口（当前为 defineTool 模板，待改造）。
+- `src/`：宿主插件源码；`index.ts` 是当前 Cordis `apply(ctx)` 入口。
 - `native/macos/`：Swift Package（可执行目标 `appshot-macos`）；`Sources/main.swift` 为 CLI 截图
   PoC；`.build/` 是 Swift 构建产物，不得提交。
-- `docs/`：`requirements.md`（PRD）、`technical.md`（技术方案）、`tasks.md`（Phase 拆分与验收）、
-  `api-grounded-review.md`（DSH 接口核查，接口真伪的权威依据）。
+- `docs/`：`requirements.md` / `technical.md`（macOS）、`requirements-windows.md` / `technical-windows.md`（Windows Basic）、
+  `tasks.md`（分阶段验收）、`api-grounded-review.md`（DSH 接口真伪的权威依据）。
 - `dist/`：tsc 构建产物；发布 `files` 仅含 `dist` 与 `cordis.patch.yml`。
 - `cordis.patch.yml`：bundle 层注入；`name` 用包名。
 - `package.json`：`@deepseek-ai/dsh-tools`（exact `0.1.0-rc.6`，`next` tag 线）、
   `@deepseek-ai/cordis`（peerDep，仅类型）。
 
-依赖方向：`src/` → `@deepseek-ai/dsh-tools` / `@deepseek-ai/cordis`（仅类型）；Native 端是独立
-Swift Package，与 Node 侧无代码依赖，只通过 NDJSON IPC 契约通信；宿主插件不反向依赖 Renderer
+依赖方向：`src/` → `@deepseek-ai/dsh-tools` / `@deepseek-ai/cordis`（仅类型）；Native Agent 是独立平台工程，
+与 Node 侧只通过 NDJSON IPC 契约通信；宿主插件不反向依赖 Renderer
 私有代码。
 
 ## Git
 
 执行 commit 时必须使用 Conventional Commits，类型仅限：`feat`、`fix`、`docs`、`style`、
 `refactor`、`perf`、`test`、`chore`。除非用户明确要求，不执行 commit、reset、checkout 或清理
-用户修改。当前目录尚未初始化 Git 仓库，且无 `.gitignore`：`dist/` 与 `native/macos/.build/`
-为构建产物，如需纳入版本管理应先与用户确认建立 `.gitignore`。
+用户修改。构建产物必须遵守现有 `.gitignore`；创建 Windows 工程时先补充 `bin/obj` 忽略规则，
+不得把 `dist/`、`native/macos/.build/` 或 Windows 构建产物作为普通源码提交。
