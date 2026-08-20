@@ -31,7 +31,13 @@ pnpm test:typecheck    # tsc 校验 tests + src（当前对未实现的计划模
 | `tests/phase5-t52-no-self-capture.test.ts` | T5.2 | 帧契约校验 + 防自截人工验收 |
 | `tests/phase6-t61-boundary-scenarios.test.ts` | T6.1 | 多显示器 / 多窗口 / Space / 通知 |
 | `tests/phase6-t62-performance-stability.test.ts` | T6.2 | 连续 10 次截图无残留 |
-| `tests/phase7-t7*.test.ts` | T7.1–T7.4 | Post-MVP 验收要点占位 |
+| `tests/phase-w0-dsh-interface-gate.test.ts` | Phase W0 | Windows DSH 真机接口 Gate 门禁测试 |
+| `tests/phase-w1-native-trigger-target.test.ts` | Phase W1 | Windows 左右 Ctrl 状态机与目标锁定 |
+| `tests/phase-w2-two-stage-capture-staging.test.ts` | Phase W2 | Windows 两阶段置前截图与 Staging 路径安全 |
+| `tests/phase-w3-node-state-machine-transport.test.ts` | Phase W3 | Windows Node 状态机、超时守卫与迟到帧防竞态 |
+| `tests/phase-w4-client-draft-recovery.test.ts` | Phase W4 | Windows Client Draft 挂载与持续恢复 |
+| `tests/phase-w5-packaging-acceptance.test.ts` | Phase W5 | Windows 跨平台包装配、选路与全链路验收 |
+| `tests/phase7-t7*.test.ts` | T7.1–T7.4 | Post-MVP 增强功能验收占位 |
 | `tests/helpers/` | — | mock ctx、临时文件、native 二进制运行/探测 |
 
 ## 红 / 绿 / skip 语义
