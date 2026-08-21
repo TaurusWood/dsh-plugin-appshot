@@ -39,3 +39,17 @@ DerivedData/
 *.swp
 *.swo
 *~
+
+# Logs & Temporary Verification Reports
+*.log
+w0-*.json
+w0-reports.jsonl
+
+# Windows Native Build Artifacts
+bin/
+obj/
+native/windows/bin/
+native/windows/obj/
+*.pdb
+*.obj
+

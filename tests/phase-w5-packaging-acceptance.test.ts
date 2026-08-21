@@ -42,8 +42,9 @@ test('W5.2 宿主平台适配层根据 process.platform 准确解析 Agent 路�
   }
 
   const root = '/app'
-  assert.equal(resolveAgentBinary('darwin', root), '/app/native/macos/.build/release/appshot-macos')
-  assert.equal(resolveAgentBinary('win32', root), '/app/bin/win-x64/appshot-win-x64.exe')
+  // 期望路径用与实现相同的 join() 构造，避免平台路径分隔符硬编码（原断言在 Windows 上失败）
+  assert.equal(resolveAgentBinary('darwin', root), join(root, 'native/macos/.build/release/appshot-macos'))
+  assert.equal(resolveAgentBinary('win32', root), join(root, 'bin/win-x64/appshot-win-x64.exe'))
   assert.throws(() => resolveAgentBinary('linux', root))
 })
 
