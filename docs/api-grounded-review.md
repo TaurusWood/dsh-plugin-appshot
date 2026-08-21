@@ -158,3 +158,66 @@ Windows Basic 因此同时锁定 `targetClientInstanceId` 和 `targetSessionId`�
 5. 验证 DSH 升级后包版本不再是 `0.1.0-rc.6` 时能够阻止未经复核的发布。
 
 Gate 失败时不得以类型断言、`any`、`@ts-ignore` 或无条件补 ACK 绕过。
+---
+
+## 6. Windows 真机 Gate 验证记录（2026-08-21）
+
+> 验证环境：**DSH Desktop 2.0.1（win32 x64）**，内置全部 `@deepseek-ai/dsh-*` `0.1.0-rc.7`。
+> 验证方式：插件 bundle 安装到 desktop profile 后重启加载；通过 Electron CDP
+> （`--remote-debugging-port=9222`）在真实 Renderer 上下文执行验证。
+
+### 6.1 关键事实修正：Renderer 加载方式与基址
+
+**实测（覆盖 §3.2 旧假设）**：
+
+- Renderer 实际以 **`http://127.0.0.1:<webServerPort>` 加载**（本机 `http://127.0.0.1:54068/?dsh-desktop-mode=compatibility&dsh-desktop-platform=win32`），
+  **不是 `file://`**；compatibility 与 advanced 仅窗口外观差异，加载方式相同；
+- `location.origin` 为真实 http 值（非 `"null"`），因此 `appshotUrl()` helper 的
+  origin 分支生效，**不会**走到 `http://dsh.internal` fallback；
+- 实测 `fetch('http://dsh.internal/...')` 在 Renderer 内 **`Failed to fetch`**（域名不可达），
+  但 `fetch(new URL(path, location.origin))` 全部成功。
+
+**结论**：交付层必须使用 `appshotUrl()` 的绝对 URL 规则（origin 优先、`dsh.internal` 仅
+作为 origin 缺失/为 null 时的理论 fallback）。真机上 origin 分支即正确路径；
+不应直接使用相对路径（旧 macOS 的 `EventSource('/plugins/...')` 假设不适用于 Windows）。
+
+### 6.2 Host 自建路由真机验证（通过）
+
+| 路由 | 实测结果 |
+| --- | --- |
+| `POST /plugins/appshot/session` | 200 `{"ok":true}`（Renderer 内 fetch；含 clientInstanceId/sessionId 校验） |
+| `GET /plugins/appshot/pending` | 无 Pending 时挂起等待（3s 探测 abort，非 404） |
+| `POST /plugins/appshot/delivery-result` | 空 body → 400 `{"error":"INVALID_FIELDS"}`（schema 校验生效） |
+| webServer host | 仅监听 `127.0.0.1`（host 门禁通过） |
+
+### 6.3 Draft API 真机验证（9/9 通过）
+
+在真实 Renderer 上下文（通过插件 client 的注入 ctx）执行全链路：
+
+| # | 验证项 | 结果 |
+| --- | --- | --- |
+| 1 | `sessions.list.getSnapshot().current` | ✅ 返回当前会话 ID（reload 后轮询恢复） |
+| 2 | `sessions.binding(sessionId)` | ✅ 返回 binding |
+| 3 | `binding.ctx` 可解析 | ✅ |
+| 4 | `conversation.createDraftImages([file])` | ✅ 返回固定 `draftId` |
+| 5 | `input.for(binding.ctx).addImages([draftId])` | ✅ accepted: true |
+| 6 | `input.snapshot.imageIds` 包含 draftId | ✅ |
+| 7 | `conversation.draftImages([draftId])` | ✅ resolved: 1 |
+| 8 | `input.removeImage(draftId)` | ✅ 移除后 imageIds 为空 |
+| 9 | `conversation.releaseDraftImage(draftId)` | ✅ 释放后 registry 为空 |
+
+行为与 §3.4 已核实形态一致，无破坏性变更（rc.6 → rc.7）。
+
+### 6.4 Reload 验证
+
+- Renderer reload 后插件 bundle rev 更新（client.js 重新加载、apply 重新执行）；
+- `sessionStorage` 活性记录跨 reload 保留（W4 恢复机制的基础）；
+- 无活跃 Session 时 `current` 为空属正常（前置条件），UI 选中恢复后轮询可取到。
+
+### 6.5 遗留与后续
+
+- 多 Client 并发轮询的 `targetClientInstanceId` 隔离：状态机单测覆盖（W3.1），
+  真机双 Client 场景待 W4 Client 实现后验收；
+- `dsh.internal` 域名在 rc.7 真机不可达，但 helper fallback 保留以兼容未来 file:// 场景；
+- 本机验证基于 `0.1.0-rc.7`，与文档基线 `0.1.0-rc.6` 的接口面已静态核查一致。
+

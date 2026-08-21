@@ -28,22 +28,24 @@ test('W0.2 [Gate] Windows DSH 真实 Draft API (createDraftImages + addImages) �
   assert.ok(true, '真实 DSH Draft 挂载与生命周期通过')
 })
 
-test('W0.3 [Fixture] HTTP register({ kind: "http", path, handler }) 路由签名规范契约', () => {
+test('W0.3 [Fixture] HTTP register({ kind: "exact", path, handler }) 路由签名规范契约', () => {
+  // kind 契约依据 api-grounded-review.md §3.1 已核实形态：'exact' | 'prefix'
+  // （测试原假设 'http' 与证据冲突，接线时修正；断言意图不变：注册签名规范）
   const server = createMockWindowsWebServer()
   
   server.register({
-    kind: 'http',
+    kind: 'exact',
     path: '/plugins/appshot/session',
     handler: async (_req, _res) => {},
   })
   
   server.register({
-    kind: 'http',
+    kind: 'exact',
     path: '/plugins/appshot/delivery-result',
     handler: async (_req, _res) => {},
   })
 
   assert.ok(server.routes.has('/plugins/appshot/session'), 'HTTP session 路由必须按规范签名注册')
-  assert.equal(server.routes.get('/plugins/appshot/session')?.kind, 'http')
+  assert.equal(server.routes.get('/plugins/appshot/session')?.kind, 'exact')
   assert.ok(server.routes.has('/plugins/appshot/delivery-result'), 'HTTP delivery-result 路由必须按规范签名注册')
 })
