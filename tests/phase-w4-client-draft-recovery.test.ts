@@ -67,15 +67,19 @@ function createClientRecoveryManager(
 
       // 4. 挂载成功并写入 Composer 注册表
       pendingItem.mounted = true
+      const mountedDraftId = pendingItem.draftId
+      if (mountedDraftId === undefined) {
+        return { action: 'MOUNTED_FAILED_NO_DRAFT_ID' }
+      }
       let sessDrafts = composerRegistryMock.get(frame.targetSessionId)
       if (!sessDrafts) {
         sessDrafts = new Set()
         composerRegistryMock.set(frame.targetSessionId, sessDrafts)
       }
-      sessDrafts.add(pendingItem.draftId)
-      sessionStorageMock.set(frame.captureId, { sessionId: frame.targetSessionId, draftId: pendingItem.draftId })
+      sessDrafts.add(mountedDraftId)
+      sessionStorageMock.set(frame.captureId, { sessionId: frame.targetSessionId, draftId: mountedDraftId })
       ackLog.push({ captureId: frame.captureId, status: 'MOUNTED', clientInstanceId })
-      return { action: 'MOUNTED_SUCCESS', draftId: pendingItem.draftId }
+      return { action: 'MOUNTED_SUCCESS', draftId: mountedDraftId }
     },
 
     onRetryTick(isComposerBusy: boolean) {
