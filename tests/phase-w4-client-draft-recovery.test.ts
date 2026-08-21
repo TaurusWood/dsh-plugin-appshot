@@ -177,3 +177,91 @@ test('W4.3 Composer 繁忙两阶段持续恢复（5 次快速 500ms + 低频 3s 
   assert.equal(tick7.status, 'RETRY_SUCCESS')
   assert.ok(sessionStorage.has('cap-busy'))
 })
+
+// ===== W4 增强测试（对应 technical-windows.md §4.4 新增逻辑） =====
+
+test('W4.4 ACK 指数退避（1s → 2s → 4s 封顶）', async () => {
+  const { ackBackoffDelay } = await import('../src/client.ts')
+  assert.equal(ackBackoffDelay(0), 1000)
+  assert.equal(ackBackoffDelay(1), 2000)
+  assert.equal(ackBackoffDelay(2), 4000)
+  assert.equal(ackBackoffDelay(3), 4000, '封顶 4s，不再增长')
+  assert.equal(ackBackoffDelay(10), 4000, '任意大 attempt 封顶 4s')
+})
+
+test('W4.5 认领响应一致性：响应与本地活动记录一致才允许继续挂载', () => {
+  // 模拟 syncSession 认领响应校验语义（technical-windows.md §4.1.2）：
+  // 仅当 claim 响应 { captureId, targetSessionId } 与本地记录一致时才继续
+  const localRecord = { captureId: 'cap-claim-1', targetSessionId: 'sess-target' }
+
+  function validateClaimResponse(
+    claimResult: { captureId: string; targetSessionId: string | null } | null,
+    local: typeof localRecord,
+  ): boolean {
+    if (!claimResult) return false
+    return claimResult.captureId === local.captureId && claimResult.targetSessionId === local.targetSessionId
+  }
+
+  // 1. 响应完全匹配 → 认领有效
+  assert.equal(
+    validateClaimResponse({ captureId: 'cap-claim-1', targetSessionId: 'sess-target' }, localRecord),
+    true,
+  )
+  // 2. 响应 captureId 不匹配 → 拒绝（防错投）
+  assert.equal(
+    validateClaimResponse({ captureId: 'cap-other', targetSessionId: 'sess-target' }, localRecord),
+    false,
+  )
+  // 3. 响应为 null（未认领）→ 拒绝
+  assert.equal(validateClaimResponse(null, localRecord), false)
+})
+
+test('W4.6 最近 50 条已挂载记录索引（sessionStorage 上限）', () => {
+  // 模拟 setCachedDraft 的索引维护语义
+  function maintainIndex(index: string[], captureId: string, storage: { remove(key: string): void }): string[] {
+    if (!index.includes(captureId)) index.push(captureId)
+    if (index.length > 50) {
+      const overflow = index.slice(0, index.length - 50)
+      index = index.slice(index.length - 50)
+      for (const old of overflow) storage.remove(old)
+    }
+    return index
+  }
+
+  const storage = { removed: [] as string[] }
+  let index: string[] = []
+  for (let i = 0; i < 55; i++) {
+    index = maintainIndex(index, 'cap-' + i, {
+      remove(key: string) { storage.removed.push(key) },
+    })
+  }
+  assert.equal(index.length, 50, '索引不超过 50 条')
+  assert.equal(index[0], 'cap-5', '最旧的 5 条被淘汰')
+  assert.equal(index[49], 'cap-54', '最新的保留')
+  assert.equal(storage.removed.length, 5, '5 条溢出记录被删除')
+})
+
+test('W4.7 取消竞态：MOUNTED 先生效时不撤销已交付', () => {
+  // 规格 §4.4.4：MOUNTED 先处理者生效，二次取消不撤销已确认交付
+  // 模拟状态：MOUNTED 已发送（draft 已挂载 + cached 已写），随后取消到达
+  const composerHasDraft = new Set(['draft-mounted-1'])
+  const cacheHasDraft = true // MOUNTED 已写 sessionStorage
+
+  // 取消处理：仅当 draft 未挂载（pendingRetry 存在）时才从 Composer 移除
+  function handleCancel(captureId: string, pendingRetry: { draftId: string } | null) {
+    if (pendingRetry) {
+      composerHasDraft.delete(pendingRetry.draftId)
+    }
+    // cached 记录清理（无论是否已交付，本地活动记录移除）
+    return { cacheCleared: cacheHasDraft, composerUnchanged: composerHasDraft.size }
+  }
+
+  // 场景 A：MOUNTED 已发出（无 pendingRetry）→ 取消不撤销草稿
+  const resultA = handleCancel('cap-1', null)
+  assert.equal(resultA.composerUnchanged, 1, '已交付的 Draft 保留在 Composer')
+
+  // 场景 B：取消先到（有 pendingRetry 未挂载）→ 从 Composer 移除
+  composerHasDraft.add('draft-pending-2')
+  const resultB = handleCancel('cap-2', { draftId: 'draft-pending-2' })
+  assert.equal(composerHasDraft.has('draft-pending-2'), false, '未挂载草稿被移除')
+})

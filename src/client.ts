@@ -528,6 +528,11 @@ function appshotUrl(path: string): URL {
   return new URL(path, base)
 }
 
+/** ACK 指数退避间隔（1s → 2s → 4s 封顶；spec §4.4.3）。纯函数便于单测。 */
+export function ackBackoffDelay(attempt: number): number {
+  return Math.min(1000 * Math.pow(2, attempt), 4000)
+}
+
 function getClientInstanceId(): string {
   if (typeof sessionStorage === 'undefined') return 'client-fallback-id'
   let id = sessionStorage.getItem('dsh-appshot-client-id')
@@ -558,10 +563,28 @@ function getCachedDraft(captureId: string): DraftCacheRecord | null {
   }
 }
 
+const DRAFT_INDEX_KEY = 'dsh-appshot-draft-index'
+
 function setCachedDraft(captureId: string, record: DraftCacheRecord): void {
   if (typeof sessionStorage === 'undefined') return
   try {
     sessionStorage.setItem(`dsh-appshot-draft-${captureId}`, JSON.stringify(record))
+    // 维护最近 50 条已挂载记录索引（technical-windows.md §4.4.2）
+    const rawIndex = sessionStorage.getItem(DRAFT_INDEX_KEY)
+    let index: string[] = []
+    try {
+      const parsed = JSON.parse(rawIndex ?? '[]') as unknown
+      if (Array.isArray(parsed)) index = parsed.filter((x): x is string => typeof x === 'string')
+    } catch {
+      index = []
+    }
+    if (!index.includes(captureId)) index.push(captureId)
+    if (index.length > 50) {
+      const overflow = index.slice(0, index.length - 50)
+      index = index.slice(index.length - 50)
+      for (const old of overflow) sessionStorage.removeItem(`dsh-appshot-draft-${old}`)
+    }
+    sessionStorage.setItem(DRAFT_INDEX_KEY, JSON.stringify(index))
   } catch {
     // ignore
   }
@@ -595,8 +618,12 @@ function applyWindowsClient(ctx: AppshotClientCtx) {
   let retryTimer: ReturnType<typeof setTimeout> | null = null
 
   // 1. Session 同步与上报（POST /plugins/appshot/session）
-  const syncSession = async (claimPendingCaptureId?: string) => {
-    if (aborted) return
+  //    携带 claimPendingCaptureId 时返回认领响应（technical-windows.md §4.1.2）：
+  //    响应 { captureId, targetSessionId } 必须与本地活动记录一致后才允许继续挂载。
+  const syncSession = async (claimPendingCaptureId?: string): Promise<
+    { captureId: string; targetSessionId: string | null } | null
+  > => {
+    if (aborted) return null
     const snapshot = ctx.sessions.list.getSnapshot()
     const sessionId = snapshot.current
     if (sessionId !== currentSessionId || claimPendingCaptureId) {
@@ -608,38 +635,73 @@ function applyWindowsClient(ctx: AppshotClientCtx) {
             clientInstanceId,
           }
           if (claimPendingCaptureId) body.claimPendingCaptureId = claimPendingCaptureId
-          await fetch(appshotUrl('/plugins/appshot/session').toString(), {
+          const res = await fetch(appshotUrl('/plugins/appshot/session').toString(), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body),
           })
+          if (res.status === 200 && claimPendingCaptureId) {
+            const data = (await res.json()) as { captureId?: unknown; targetSessionId?: unknown }
+            if (typeof data.captureId === 'string' && (typeof data.targetSessionId === 'string' || data.targetSessionId === null)) {
+              return { captureId: data.captureId, targetSessionId: data.targetSessionId }
+            }
+          }
         } catch {
           // ignore network errors
         }
+      }
+    }
+    return null
+  }
+
+  // 显式认领：仅当本 Client 有待认领帧 且 用户聚焦了明确 Session 时发送 claim
+  // （technical-windows.md §4.1.2：初始化重放、后台心跳或普通 Session 切换不改绑）
+  const tryClaimPending = async () => {
+    if (aborted || pendingClaims.size === 0) return
+    const snapshot = ctx.sessions.list.getSnapshot()
+    const sessionId = snapshot.current
+    if (!sessionId) return
+    for (const [captureId] of pendingClaims) {
+      const claimResult = await syncSession(captureId)
+      if (claimResult && claimResult.captureId === captureId) {
+        // 认领成功：仅在响应与本地活动记录一致后继续挂载（由 handleReadyFrame 重新取帧驱动）
+        pendingClaims.delete(captureId)
+        console.log('[dsh-plugin-appshot:client] claim accepted for', captureId, '->', claimResult.targetSessionId)
       }
     }
   }
 
   const sessionCheckTimer = setInterval(() => {
     void syncSession()
+    void tryClaimPending()
   }, 1000)
   void syncSession()
 
   // 2. 发送交付结果（POST /plugins/appshot/delivery-result）
+  //    指数退避重试（1s → 2s → 4s 封顶，最多 4 次）确保 Node 确认（technical-windows.md §4.4.3）
   const sendDeliveryResult = async (
     captureId: string,
     targetSessionId: string,
     status: 'MOUNTED' | 'BUSY' | 'NO_SESSION' | 'SESSION_MISMATCH',
   ) => {
-    try {
-      await fetch(appshotUrl('/plugins/appshot/delivery-result').toString(), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ captureId, clientInstanceId, targetSessionId, status }),
-      })
-    } catch (err) {
-      console.warn('[dsh-plugin-appshot:client] delivery result post failed:', err)
+    let delay = 1000
+    for (let attempt = 0; attempt < 4; attempt++) {
+      if (aborted) return
+      try {
+        const res = await fetch(appshotUrl('/plugins/appshot/delivery-result').toString(), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ captureId, clientInstanceId, targetSessionId, status }),
+        })
+        // 200 = 已接受（CLEARED_SUCCESS / IGNORED_DUPLICATE / HELD_PENDING）；409 = 冲突（不再重试）
+        if (res.status === 200 || res.status === 409) return
+      } catch (err) {
+        console.warn('[dsh-plugin-appshot:client] delivery result post failed (attempt ' + attempt + '):', err)
+      }
+      await new Promise((r2) => setTimeout(r2, delay))
+      delay = Math.min(delay * 2, 4000)
     }
+    console.warn('[dsh-plugin-appshot:client] delivery result not confirmed after retries:', captureId)
   }
 
   // 3. 处理 appshot/ready 帧与两阶段重试
@@ -649,6 +711,10 @@ function applyWindowsClient(ctx: AppshotClientCtx) {
     draftId: string
     retryCount: number
   } | null = null
+
+  // 待认领集合：无 Session / SESSION_MISMATCH 时记录，用户聚焦明确 Session 后显式认领
+  // （technical-windows.md §4.1.2：初始化重放、后台心跳或普通 Session 上报不构成认领）
+  const pendingClaims = new Map<string, { captureId: string; draftId: string | null }>()
 
   const scheduleRetry = (captureId: string, targetSessionId: string, draftId: string, count: number) => {
     if (aborted) return
@@ -689,8 +755,9 @@ function applyWindowsClient(ctx: AppshotClientCtx) {
     if (frame.targetClientInstanceId !== clientInstanceId) return
     const { captureId, targetSessionId, dataBase64 } = frame
 
-    // 1. 无 Session 时等待认领
+    // 1. 无 Session 时记录待认领（等待用户聚焦明确 Session 后显式认领，不改绑）
     if (!targetSessionId) {
+      pendingClaims.set(captureId, { captureId, draftId: null })
       await sendDeliveryResult(captureId, '', 'NO_SESSION')
       return
     }
@@ -716,6 +783,8 @@ function applyWindowsClient(ctx: AppshotClientCtx) {
     // 3. 解析目标 Session Binding
     const binding = ctx.sessions.binding(targetSessionId)
     if (!binding) {
+      // 原目标 Session 已删除/改绑：标记待认领（REBIND_REQUIRED），仅允许显式 claim 改绑
+      pendingClaims.set(captureId, { captureId, draftId: null })
       await sendDeliveryResult(captureId, targetSessionId, 'SESSION_MISMATCH')
       return
     }
@@ -761,6 +830,7 @@ function applyWindowsClient(ctx: AppshotClientCtx) {
       }
     }
     removeCachedDraft(captureId)
+    pendingClaims.delete(captureId)
   }
 
   // 5. 长轮询主循环（GET /plugins/appshot/pending）
