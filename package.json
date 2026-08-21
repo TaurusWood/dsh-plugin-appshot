@@ -61,7 +61,11 @@
     "build": "npx esbuild src/index.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/index.js && npx esbuild src/client.ts --bundle --platform=browser --format=cjs --external:react --external:react-dom --external:react/jsx-runtime --banner:js=\"window.__ModuleLoader__.load({ id: 'dsh-plugin-appshot', factory: (require) => { var module = { exports: {} }; var exports = module.exports;\" --footer:js=\"return module.exports; } });\" --outfile=dist/client.js",
     "build:native": "./native/macos/scripts/build-app.sh",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "DSH_DISABLE_AGENT_SPAWN=1 node --test --test-concurrency=1 \"tests/**/*.test.ts\"",
+    "test": "node scripts/run-tests.mjs",
+    "test:windows": "node scripts/run-tests.mjs --windows",
+    "test:macos": "node scripts/run-tests.mjs --macos",
+    "test:all": "node scripts/run-tests.mjs --all",
+    "test:native": "dotnet test native/windows/AppshotWin.Tests/AppshotWin.Tests.csproj",
     "test:typecheck": "tsc -p tsconfig.tests.json --noEmit",
     "changelog": "node scripts/gen-changelog.mjs",
     "release": "pnpm run changelog && git add CHANGELOG.md CHANGELOG.zh-CN.md && bumpp --all --commit \"chore: release v%s\" --tag \"v%s\" --push"
