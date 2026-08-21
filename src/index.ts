@@ -7,6 +7,7 @@ import { createAppshotSSEHub, type AppshotSSEHub } from './sse.ts'
 import { ingestScreenshot } from './ingest.ts'
 import { startAgent, type AgentProcess } from './agent.ts'
 import type { AppshotConfig, AppshotEventCapture, ImageAttachmentRef } from './types.ts'
+import { applyWindows, type WindowsPluginRuntime } from './windows/index.ts'
 
 // 镜像自 @deepseek-ai/dsh-attachment StoredImageAttachment（禁 any/@ts-ignore）
 interface HostAttachmentStore {
@@ -19,6 +20,7 @@ export const inject = ['attachments', 'webServer', 'sessions', 'settings']
 export interface PluginState {
   sseHub?: AppshotSSEHub
   agent?: AgentProcess
+  windows?: WindowsPluginRuntime
 }
 
 let globalState: PluginState = {}
@@ -52,7 +54,8 @@ function resolveAgentBinaryPath(): string {
   return candidates[0]
 }
 
-export function apply(ctx: Context) {
+/** macOS 路径（原有实现，保持不动）。 */
+function applyMacos(ctx: Context) {
   console.log('[dsh-plugin-appshot] plugin applying...')
 
   // 1. 启动时孤儿文件 GC
@@ -277,7 +280,28 @@ export function apply(ctx: Context) {
   console.log('[dsh-plugin-appshot] plugin applied successfully')
 }
 
+/** 平台分流入口：win32 走 Windows Basic 路径，其余保持 macOS 实现。 */
+export function apply(ctx: Context) {
+  if (process.platform === 'win32') {
+    console.log('[dsh-plugin-appshot] windows platform detected, applying windows runtime...')
+    applyWindows(ctx as unknown as Parameters<typeof applyWindows>[0], {})
+      .then((runtime) => {
+        globalState.windows = runtime
+        console.log('[dsh-plugin-appshot] windows runtime applied, staging:', runtime.stagingDir)
+      })
+      .catch((err) => {
+        console.error('[dsh-plugin-appshot] windows runtime apply failed:', err)
+      })
+    return
+  }
+  applyMacos(ctx)
+}
+
 export function dispose(ctx?: Context) {
+  if (globalState.windows) {
+    void globalState.windows.dispose()
+    globalState.windows = undefined
+  }
   if (globalState.agent) {
     globalState.agent.stop().catch(() => {})
     globalState.agent = undefined
@@ -296,3 +320,4 @@ export { createAppshotClient, AppshotSettingsSection } from './client.ts'
 export { createNdjsonParser } from './ipc.ts'
 export { startAgent } from './agent.ts'
 export * from './types.ts'
+export { applyWindows } from './windows/index.ts'

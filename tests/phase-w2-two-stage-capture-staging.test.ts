@@ -80,7 +80,8 @@ test('W2.4 严密的 realpath + relative 路径安全校验（防兄弟目录与
   const stagingDir = join(baseDir, 'inst-123')
   const evilSiblingDir = join(baseDir, 'inst-123-evil')
   
-  const captureId = 'cap-abc-123'
+  // 生产实现按 technical-windows.md §6 要求先做 UUID parser 校验，fixture 使用合法 UUID
+  const captureId = '1c2a3b4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d'
   const validFile = join(stagingDir, `${captureId}.png`)
   const evilFile = join(evilSiblingDir, `${captureId}.png`)
   const wrongNameFile = join(stagingDir, 'wrong-id.png')

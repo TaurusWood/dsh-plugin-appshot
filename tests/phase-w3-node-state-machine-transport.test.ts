@@ -11,118 +11,76 @@
  *   4. 未知/迟到 appshot 帧只做路径安全校验与即时 unlink（不读取、不交付）；
  *   5. Agent 在 PENDING_ACK 期间退出必须保留内存 payload，允许 Client 继续交付，绝不丢图；
  *   6. 重复已完成 ACK 幂等返回 200。
+ *
+ * 接线说明：本文件由"内部模拟器"接线为生产实现
+ *   src/windows/state-machine.ts（WindowsCaptureStateMachine）的适配包装，
+ *   断言全部保持原样；状态机与传输解耦，poll 的结构化结果在包装层映射为
+ *   原断言的状态码语义（HTTP 层映射见 src/windows/http-routes.ts，按文档返回 204）。
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { WindowsCaptureState } from './helpers/windows-types.ts'
+import { WindowsCaptureStateMachine } from '../src/windows/state-machine.ts'
 
+/**
+ * 生产状态机的测试适配包装：保持原 createNodeCaptureManager 方法面，
+ * 内部全部驱动生产 WindowsCaptureStateMachine。
+ */
 function createNodeCaptureManager() {
-  let state: WindowsCaptureState = { type: 'IDLE' }
-  const cancelledIds = new Set<string>()
-  const completedTuples = new Set<string>() // 存储 captureId:clientInstanceId:sessionId
+  const machine = new WindowsCaptureStateMachine()
   let activeClientInstanceId: string | null = 'client-inst-1'
   let activeSessionId: string | null = 'session-123'
 
   return {
-    getState: () => state,
+    getState: (): WindowsCaptureState => machine.getState(),
     setActiveClientAndSession: (clientId: string | null, sessId: string | null) => {
       activeClientInstanceId = clientId
       activeSessionId = sessId
+      machine.setLastActiveClient(clientId, sessId)
     },
-    
-    // 1. 收到 capture/started：锁定 Client 与 Session
+
+    // 1. 收到 capture/request：锁定 Client 与 Session（生产实现）
     onCaptureStarted(captureId: string, now: number) {
-      if (state.type !== 'IDLE') {
-        return { accepted: false, error: 'BUSY' }
-      }
-      state = {
-        type: 'IN_FLIGHT',
-        captureId,
-        targetClientInstanceId: activeClientInstanceId,
-        targetSessionId: activeSessionId,
-        startedAt: now,
-      }
-      return { accepted: true, targetClientInstanceId: activeClientInstanceId, targetSessionId: activeSessionId }
+      return machine.onCaptureStarted(captureId, now, activeClientInstanceId, activeSessionId)
     },
 
-    // 2. 收到 appshot 落盘通知
+    // 2. 收到 appshot 落盘通知（生产实现：校验 + 转移至 PENDING_ACK）
     onAppshotReceived(captureId: string, payload: Uint8Array) {
-      if (cancelledIds.has(captureId) || state.type !== 'IN_FLIGHT' || state.captureId !== captureId) {
-        return { accepted: false, shouldUnlink: true }
-      }
-      state = {
-        type: 'PENDING_ACK',
-        captureId,
-        targetClientInstanceId: state.targetClientInstanceId,
-        targetSessionId: state.targetSessionId,
-        payload,
-        metadata: {
-          appName: 'Chrome',
-          mediaType: 'image/png',
-          width: 1920,
-          height: 1080,
-          bytes: payload.length,
-          timestamp: Date.now(),
-        },
-        isFallback: false,
-        fallbackReason: null,
-      }
-      return { accepted: true, targetClientInstanceId: state.targetClientInstanceId, targetSessionId: state.targetSessionId }
+      return machine.onAppshotReceived(captureId, payload, undefined, false, null)
     },
 
-    // 3. Client 定向长轮询获取图片载荷
-    onClientPoll(requestClientId: string, captureId: string) {
-      if (state.type !== 'PENDING_ACK' || state.captureId !== captureId) {
-        return { status: 404, data: null }
+    // 3. Client 定向长轮询（适配：生产结构化结果 → 原断言状态码）
+    // 测试语义是"Client 请求读取该 captureId 的数据"，映射为不带 knownCaptureId 的 poll；
+    // knownCaptureId 语义（同 ID 等待状态变化）由生产 HTTP 层按文档实现。
+    onClientPoll(requestClientId: string, _captureId: string) {
+      const result = machine.poll(requestClientId, null, null)
+      if (result.outcome === 'ready') {
+        return { status: 200, data: result.payload }
       }
-      // 必须匹配目标 ClientInstanceId
-      if (state.targetClientInstanceId && state.targetClientInstanceId !== requestClientId) {
+      if (result.outcome === 'not-target') {
         return { status: 403, error: 'CLIENT_MISMATCH', data: null }
       }
-      return { status: 200, data: state.payload }
+      return { status: 404, data: null }
     },
 
-    // 4. 15 秒超时守卫触发
+    // 4. 15 秒超时守卫触发（生产实现）
     onTimeoutTriggered(now: number) {
-      if (state.type === 'IN_FLIGHT' && now - state.startedAt >= 15000) {
-        cancelledIds.add(state.captureId)
-        const timedOutId = state.captureId
-        state = { type: 'IDLE' }
-        return { timedOut: true, captureId: timedOutId }
-      }
-      return { timedOut: false }
+      return machine.onTimeoutTriggered(now)
     },
 
-    // 5. 收到 Delivery Result (ACK)，三元组严格匹配
+    // 5. 收到 Delivery Result (ACK)，三元组严格匹配（生产实现）
     onDeliveryResult(captureId: string, clientInstanceId: string, targetSessionId: string, status: string) {
-      const tupleKey = `${captureId}:${clientInstanceId}:${targetSessionId}`
-      if (completedTuples.has(tupleKey)) {
-        return { httpCode: 200, action: 'IGNORED_DUPLICATE' }
-      }
-      if (
-        state.type !== 'PENDING_ACK' ||
-        state.captureId !== captureId ||
-        (state.targetClientInstanceId && state.targetClientInstanceId !== clientInstanceId) ||
-        (state.targetSessionId && state.targetSessionId !== targetSessionId)
-      ) {
-        return { httpCode: 409, action: 'CONFLICT_REJECTED' }
-      }
-
-      if (status === 'MOUNTED') {
-        completedTuples.add(tupleKey)
-        state = { type: 'IDLE' } // 释放内存 payload
-        return { httpCode: 200, action: 'CLEARED_SUCCESS' }
-      }
-
-      return { httpCode: 200, action: 'HELD_PENDING' }
+      return machine.onDeliveryResult({
+        captureId,
+        clientInstanceId,
+        targetSessionId,
+        status: status as 'MOUNTED',
+      })
     },
 
-    // 6. Agent 进程退出处理：仅在 IN_FLIGHT 时重置，在 PENDING_ACK 必须保留！
+    // 6. Agent 进程退出处理（生产实现：IN_FLIGHT 重置、PENDING_ACK 保留）
     onAgentExit() {
-      if (state.type === 'IN_FLIGHT') {
-        state = { type: 'IDLE' }
-      }
-      // 若处于 PENDING_ACK，保持状态，允许 Client 继续完成挂载并 ACK！
+      machine.onAgentExit()
     },
   }
 }
@@ -185,7 +143,12 @@ test('W3.3 Agent 在 PENDING_ACK 期间退出，必须保留内存 Payload 允�
 
   // 状态必须仍然保持 PENDING_ACK，且 Payload 完好！
   assert.equal(mgr.getState().type, 'PENDING_ACK')
-  assert.equal((mgr.getState() as any).payload.length, 4)
+  const pendingState = mgr.getState()
+  if (pendingState.type !== 'PENDING_ACK') {
+    assert.fail('expected PENDING_ACK')
+    return
+  }
+  assert.equal(pendingState.payload.length, 4)
 
   // Client 仍可正常轮询和完成 ACK
   assert.equal(mgr.onClientPoll('client-inst-1', 'cap-1').status, 200)
