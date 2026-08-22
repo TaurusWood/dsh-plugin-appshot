@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.InteropServices;
 
 namespace AppshotWin.Capture;
@@ -45,71 +47,94 @@ public static class TargetWindowFinder
     private const string ClassShellSecondaryTray = "Shell_SecondaryTrayWnd";
 
     /// <summary>
-    /// 在触发瞬间的物理坐标上解析可捕获目标。
-    /// dshPid 为注入的 DSH 主进程 PID（排除 DSH 自身窗口）。
+    /// 解析目标：鼠标所在显示器上 Z 序最靠前的可捕获顶层窗口（产品决策变更，2026-08-22）。
+    /// 并列最前（互不遮挡、如分屏）时取鼠标下的窗口；全部被遮挡时退化 Z 序第一个。
+    /// dshPid 为注入的 DSH 主进程 PID（DSH 窗口不作候选，但仍计为遮挡源）。
     /// </summary>
-    public static TargetWindowResolveResult Resolve(
-        int cursorX, int cursorY, int dshPid, Func<IntPtr, bool>? isVisibleOverride = null)
+    public static TargetWindowResolveResult ResolveTopmost(int cursorX, int cursorY, int dshPid)
     {
-        // 1. WindowFromPoint：鼠标物理坐标命中
-        var leaf = NativeMethods.WindowFromPoint(new NativePoint { X = cursorX, Y = cursorY });
-        if (leaf == IntPtr.Zero)
-            return new TargetWindowResolveResult(null, TargetError.NoTargetWindow);
-
-        // 2. GA_ROOT 规范化到顶层窗口
-        var top = NativeMethods.GetAncestor(leaf, GA_ROOT);
-        if (top == IntPtr.Zero) top = leaf;
-
-        // 3. 可见性与最小化
-        bool visible = isVisibleOverride?.Invoke(top) ?? NativeMethods.IsWindowVisible(top);
-        if (!visible)
-            return new TargetWindowResolveResult(null, TargetError.NoTargetWindow);
-        if (NativeMethods.IsIconic(top))
-            return new TargetWindowResolveResult(null, TargetError.Minimized);
-
-        // 4. 类名与进程
-        var className = GetClassName(top);
-        var pid = GetWindowProcessId(top);
-        var processName = GetProcessName(pid);
-
-        // 5. 排除 DSH 自身（PID 或 进程名）
-        if (TargetFilter.IsDshProcess(pid, processName, dshPid))
-            return new TargetWindowResolveResult(null, TargetError.DshWindow);
-
-        // 6. 排除桌面与任务栏
-        if (className is ClassProgman or ClassWorkerW)
-            return new TargetWindowResolveResult(null, TargetError.Desktop);
-        if (className is ClassShellTray or ClassShellSecondaryTray)
-            return new TargetWindowResolveResult(null, TargetError.Taskbar);
-
-        // 7. 排除 Cloaked（DWM）
-        if (IsCloaked(top))
-            return new TargetWindowResolveResult(null, TargetError.Cloaked);
-
-        // 8. DWM 有效外框（排除阴影的真实可视物理边界，DWM 失败时用 GetWindowRect 兜底）
-        var bounds = GetExtendedFrameBounds(top);
-        if (bounds.IsEmpty)
-        {
-            var wr = default(Rect);
-            if (NativeMethods.GetWindowRect(top, ref wr)) bounds = wr;
-        }
-        if (bounds.IsEmpty)
-            return new TargetWindowResolveResult(null, TargetError.NoTargetWindow);
-
-        // 9. 单显示器校验：鼠标所在显示器的 rcMonitor 必须包含外框（允许最大化负边框容差）
         var monitorRect = GetMonitorRectFromPoint(cursorX, cursorY);
-        if (!SingleMonitorCheck.IsWithinMonitor(bounds, monitorRect))
-            return new TargetWindowResolveResult(null, TargetError.AcrossMonitors);
-
-        // 10. 裁剪至物理屏幕范围（去除最大化窗口在屏幕外的负边框）
-        bounds = SingleMonitorCheck.ClampToMonitor(bounds, monitorRect);
-        if (bounds.IsEmpty || bounds.Width <= 0 || bounds.Height <= 0)
+        if (monitorRect.IsEmpty)
             return new TargetWindowResolveResult(null, TargetError.NoTargetWindow);
 
-        var title = GetWindowTitle(top);
+        // 1. EnumWindows 天然按 Z 序（顶→底）枚举；一次遍历同时收集遮挡源与候选
+        var occluders = new List<Rect>();               // 可见普通窗口边界（遮挡判定源）
+        var candidates = new List<TopmostCandidate>();  // Z 序可捕获候选
+        NativeMethods.EnumWindows((hwnd, _) =>
+        {
+            if (!NativeMethods.IsWindowVisible(hwnd) || NativeMethods.IsIconic(hwnd)) return true;
+            var className = GetClassName(hwnd);
+            if (className is ClassProgman or ClassWorkerW or ClassShellTray or ClassShellSecondaryTray)
+                return true; // 系统表面：既非候选也非遮挡源
+            if (IsCloaked(hwnd)) return true;           // 不可见：非候选非遮挡
+            var pid = GetWindowProcessId(hwnd);
+            bool isDsh = TargetFilter.IsDshProcess(pid, GetProcessName(pid), dshPid);
+            var bounds = GetExtendedFrameBounds(hwnd);
+            if (bounds.IsEmpty)
+            {
+                var wr = default(Rect);
+                if (NativeMethods.GetWindowRect(hwnd, ref wr)) bounds = wr;
+            }
+            if (bounds.IsEmpty || !RectsIntersect(bounds, monitorRect))
+                return true; // 不在鼠标屏：与本屏裁决无关
+
+            bool occluded = occluders.Any(o => RectsIntersect(o, bounds));
+            occluders.Add(bounds);
+            if (!isDsh) candidates.Add(new TopmostCandidate(hwnd, bounds, occluded));
+            return true;
+        }, IntPtr.Zero);
+
+        if (candidates.Count == 0)
+            return new TargetWindowResolveResult(null, TargetError.NoTargetWindow);
+
+        // 2. 鼠标下顶层窗口（并列裁决用）
+        IntPtr hwndUnderCursor = IntPtr.Zero;
+        var leaf = NativeMethods.WindowFromPoint(new NativePoint { X = cursorX, Y = cursorY });
+        if (leaf != IntPtr.Zero)
+        {
+            hwndUnderCursor = NativeMethods.GetAncestor(leaf, GA_ROOT);
+            if (hwndUnderCursor == IntPtr.Zero) hwndUnderCursor = leaf;
+        }
+
+        var chosen = PickTopmost(candidates, hwndUnderCursor);
+
+        // 3. 单屏校验 + 物理边界裁剪（合同不变：跨屏报错、不裁剪）
+        if (!SingleMonitorCheck.IsWithinMonitor(chosen.Bounds, monitorRect))
+            return new TargetWindowResolveResult(null, TargetError.AcrossMonitors);
+        var clamped = SingleMonitorCheck.ClampToMonitor(chosen.Bounds, monitorRect);
+        if (clamped.IsEmpty || clamped.Width <= 0 || clamped.Height <= 0)
+            return new TargetWindowResolveResult(null, TargetError.NoTargetWindow);
+
         return new TargetWindowResolveResult(
-            new TargetWindow(top, pid, className, bounds, title), TargetError.None);
+            new TargetWindow(
+                chosen.Hwnd,
+                GetWindowProcessId(chosen.Hwnd),
+                GetClassName(chosen.Hwnd),
+                clamped,
+                GetWindowTitle(chosen.Hwnd)),
+            TargetError.None);
     }
+
+    /// <summary>Z 序候选（Occluded = 被更高层可见窗口遮挡）。</summary>
+    public readonly record struct TopmostCandidate(IntPtr Hwnd, Rect Bounds, bool Occluded);
+
+    /// <summary>
+    /// 裁决纯逻辑（可单测）：唯一完全可见 → 它；多个并列完全可见 → 鼠标下的
+    /// （鼠标下不在集合则取第一个）；全部被遮挡 → Z 序第一个。
+    /// </summary>
+    public static TopmostCandidate PickTopmost(IReadOnlyList<TopmostCandidate> zOrdered, IntPtr hwndUnderCursor)
+    {
+        var fullyVisible = zOrdered.Where(c => !c.Occluded).ToList();
+        if (fullyVisible.Count > 1 && hwndUnderCursor != IntPtr.Zero)
+        {
+            var under = fullyVisible.FirstOrDefault(c => c.Hwnd == hwndUnderCursor);
+            if (under.Hwnd != IntPtr.Zero) return under;
+        }
+        return fullyVisible.Count > 0 ? fullyVisible[0] : zOrdered[0];
+    }
+
+    private static bool RectsIntersect(Rect a, Rect b) =>
+        a.Left < b.Right && a.Right > b.Left && a.Top < b.Bottom && a.Bottom > b.Top;
 
     /// <summary>重新校验窗口外框是否仍完整位于同一显示器（置前后二次校验）。</summary>
     public static bool IsStillSingleMonitor(IntPtr hwnd, int cursorX, int cursorY)
@@ -244,6 +269,12 @@ internal static partial class NativeMethods
 {
     internal const int MONITOR_DEFAULTTONEAREST = 2;
     internal const int MONITOR_DEFAULTTOPRIMARY = 1;
+
+    internal delegate bool EnumWindowsProc(IntPtr hwnd, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
 
     [DllImport("user32.dll")]
     internal static extern IntPtr WindowFromPoint(NativePoint p);

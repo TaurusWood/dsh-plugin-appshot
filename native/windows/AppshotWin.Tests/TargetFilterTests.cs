@@ -117,3 +117,45 @@ public class SingleMonitorCheckTests
         Assert.False(SingleMonitorCheck.IsWithinMonitor(win, Monitor));
     }
 }
+
+public class TopmostPickerTests
+{
+    private static readonly Rect R = new() { Left = 0, Top = 0, Right = 100, Bottom = 100 };
+
+    private static TargetWindowFinder.TopmostCandidate C(long hwnd, bool occluded = false) =>
+        new(new IntPtr(hwnd), R, occluded);
+
+    [Fact]
+    public void SingleFullyVisibleWindowIsChosen()
+    {
+        var list = new[] { C(1), C(2, occluded: true), C(3, occluded: true) };
+        var pick = TargetWindowFinder.PickTopmost(list, IntPtr.Zero);
+        Assert.Equal(new IntPtr(1), pick.Hwnd);
+    }
+
+    [Fact]
+    public void ParallelVisibleWindowsPreferOneUnderCursor()
+    {
+        // 分屏并列：两个完全可见，鼠标在第二个上
+        var list = new[] { C(1), C(2) };
+        var pick = TargetWindowFinder.PickTopmost(list, new IntPtr(2));
+        Assert.Equal(new IntPtr(2), pick.Hwnd);
+    }
+
+    [Fact]
+    public void CursorOutsideCandidatesFallsBackToFirst()
+    {
+        // 鼠标下的窗口不在并列集合（如鼠标在任务栏/DSH 上）→ Z 序第一个
+        var list = new[] { C(1), C(2) };
+        var pick = TargetWindowFinder.PickTopmost(list, new IntPtr(99));
+        Assert.Equal(new IntPtr(1), pick.Hwnd);
+    }
+
+    [Fact]
+    public void AllOccludedFallsBackToFirstInZOrder()
+    {
+        var list = new[] { C(1, occluded: true), C(2, occluded: true) };
+        var pick = TargetWindowFinder.PickTopmost(list, new IntPtr(2));
+        Assert.Equal(new IntPtr(1), pick.Hwnd);
+    }
+}

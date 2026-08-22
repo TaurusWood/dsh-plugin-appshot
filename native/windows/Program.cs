@@ -252,8 +252,8 @@ internal static class Program
         // 1. 先同步隐藏所有活动通知
         NoActivateToast.HideAll();
 
-        // 2. 目标锁定（触发瞬间坐标）
-        var resolve = TargetWindowFinder.Resolve(trigger.X, trigger.Y, _dshPid);
+        // 2. 目标锁定：鼠标屏上 Z 序最靠前窗口（并列取鼠标下，见 TargetWindowFinder.ResolveTopmost）
+        var resolve = TargetWindowFinder.ResolveTopmost(trigger.X, trigger.Y, _dshPid);
         if (resolve.Window is null)
         {
             // 测试模式：resolve 失败仍输出 capture/request 诊断帧（仅 --diag-target）
