@@ -65,8 +65,10 @@ Windows 代码尚未实施，不得把 Windows 文档中的伪代码、协议或
    `ImageAttachmentRef` 没有 `url` 字段。Windows Basic 禁止调用 `saveImage`。
 6. 宿主侧不猜测"活跃会话"：只处理明确给定的 `sessionId`；活跃会话由客户端模块在 Renderer 侧
    识别并经自建通道上报。
-7. `@deepseek-ai/cordis` 是 peerDependency：代码中只允许 `import type`（编译期擦除），
-   禁止运行时导入 cordis 值；`ctx` 由宿主注入。
+7. `package.json` **不得声明 `peerDependencies`**：Windows 下 pnpm 会为 peer 依赖在包内创建
+   **相对路径符号链接**，未开开发者模式的普通用户权限必然 EPERM（0.2.0 曾因此全员安装失败）。
+   `@deepseek-ai/cordis` 与 `@deepseek-ai/dsh-tools` 以 devDependencies 提供类型；代码仍然只允许
+   `import type`（编译期擦除），禁止运行时导入 cordis 值；`ctx` 由宿主注入，运行时零依赖。
 8. 禁止裸 `npm i @deepseek-ai/dsh-tools`（npm `latest` 是过期 0.0.1-rc.1）；保持
    `0.1.0-rc.6` 精确版本，所有 `@deepseek-ai/dsh-*` 在同一 `0.1.0-rc.x` 线上，避免双模块副本。
 9. 纯 ESM：`package.json` 必须 `"type": "module"`；tsc 用 `module: esnext` +
@@ -122,10 +124,11 @@ dsh --profile my-profile                        # 观察 "[dsh-plugin-appshot] r
   PoC；`.build/` 是 Swift 构建产物，不得提交。
 - `docs/`：`requirements.md` / `technical.md`（macOS）、`requirements-windows.md` / `technical-windows.md`（Windows Basic）、
   `tasks.md`（分阶段验收）、`api-grounded-review.md`（DSH 接口真伪的权威依据）。
-- `dist/`：tsc 构建产物；发布 `files` 仅含 `dist` 与 `cordis.patch.yml`。
+- `dist/`：构建产物；发布 `files` 含 `dist`、`cordis.patch.yml` 与两端 Native 产物
+  （`native/macos/.build/Appshot Agent.app`、`native/windows/bin/win-x64`）。
 - `cordis.patch.yml`：bundle 层注入；`name` 用包名。
-- `package.json`：`@deepseek-ai/dsh-tools`（exact `0.1.0-rc.6`，`next` tag 线）、
-  `@deepseek-ai/cordis`（peerDep，仅类型）。
+- `package.json`：`@deepseek-ai/dsh-tools`（devDep，exact `0.1.0-rc.6`，`next` tag 线）、
+  `@deepseek-ai/cordis`（devDep `^4.0.1`，仅类型）；不声明 `peerDependencies`（见硬规则 7）。
 
 依赖方向：`src/` → `@deepseek-ai/dsh-tools` / `@deepseek-ai/cordis`（仅类型）；Native Agent 是独立平台工程，
 与 Node 侧只通过 NDJSON IPC 契约通信；宿主插件不反向依赖 Renderer

@@ -156,7 +156,7 @@ swift build && .build/debug/appshot-macos --list-windows          # list captura
 .build/debug/appshot-macos --cli-capture --output /tmp/test.png    # frontmost-window capture PoC
 ```
 
-Dependency notes: `@deepseek-ai/dsh-tools` and `@deepseek-ai/cordis` are peerDependencies (provided by the host; `import type` only — `ctx` is injected at runtime); versions stay pinned to the `0.1.0-rc.6` line (npm `latest` is a stale 0.0.1-rc.1 — don't `npm i` over it).
+Dependency notes: `@deepseek-ai/cordis` (`^4.0.1`) and `@deepseek-ai/dsh-tools` (exact `0.1.0-rc.6`; npm `latest` is a stale 0.0.1-rc.1 — don't `npm i` over it) are devDependencies used for types only during development; the package metadata deliberately declares **no `peerDependencies`** — on Windows, pnpm creates relative symlinks for peer dependencies, which fails with EPERM for regular users (without Developer Mode). The code uses `import type` only; `ctx` is injected by the host at runtime, so the plugin has zero runtime dependencies.
 
 Publishing (technical-windows.md §7.4): a tag triggers the two-runner GitHub Actions workflow — macOS builds `Appshot Agent.app`, Windows builds `appshot-win-x64.exe`; the assemble job restores both artifacts and runs `npm publish` (`prepack` is platform-aware: it builds the native agent for the current platform, and in CI it enforces a both-artifacts gate that blocks the release if either is missing). A local `pnpm pack` yields a single-platform package and is not a release source.
 

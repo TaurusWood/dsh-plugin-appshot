@@ -74,12 +74,9 @@
     "changelog": "node scripts/gen-changelog.ts",
     "release": "pnpm run changelog && git add CHANGELOG.md CHANGELOG.zh-CN.md && bumpp --all --commit \"chore: release v%s\" --tag \"v%s\" --push"
   },
-  "peerDependencies": {
-    "@deepseek-ai/cordis": "^4.0.1",
-    "@deepseek-ai/dsh-tools": "0.1.0-rc.6"
-  },
   "devDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-tools": "0.1.0-rc.6",
     "@types/node": "^22.10.0",
     "@types/react": "^18.3.31",
     "bumpp": "^12.2.1",

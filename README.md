@@ -156,7 +156,7 @@ swift build && .build/debug/appshot-macos --list-windows          # 列出可捕
 .build/debug/appshot-macos --cli-capture --output /tmp/test.png    # 前台窗口截图 PoC
 ```
 
-依赖约束：`@deepseek-ai/dsh-tools` 与 `@deepseek-ai/cordis` 均为 peerDependencies（宿主提供；代码中只 `import type`，运行时由宿主注入 `ctx`）；版本锁定 `0.1.0-rc.6` 线（npm `latest` 是过期 0.0.1-rc.1，勿用 `npm i` 覆盖）。
+依赖约束：`@deepseek-ai/cordis`（`^4.0.1`）与 `@deepseek-ai/dsh-tools`（exact `0.1.0-rc.6`，npm `latest` 是过期 0.0.1-rc.1，勿用 `npm i` 覆盖）均为 devDependencies，仅在开发期提供类型；包元数据**不声明 `peerDependencies`**——Windows 下 pnpm 会为 peer 依赖创建相对符号链接，普通用户权限（未开开发者模式）安装必然 EPERM 失败。代码只 `import type`，运行时 `ctx` 由宿主注入，插件零运行时依赖。
 
 发布（technical-windows.md §7.4）：tag 触发 GitHub Actions 双 runner——macOS 构建 `Appshot Agent.app`、Windows 构建 `appshot-win-x64.exe`，装配机还原两端产物后 `npm publish`（`prepack` 平台感知：本机构建 Native + `CI` 环境强制双端产物 Gate，缺一即阻断）。本地 `pnpm pack` 仅产出单平台包，不作为正式发布源。
 
