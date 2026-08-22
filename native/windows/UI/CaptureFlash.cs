@@ -96,17 +96,35 @@ public static class CaptureFlash
     private static void RegisterClassOnce()
     {
         if (_classRegistered) return;
-        // 亮蓝边框（#5B9DFF，COLORREF BGR）
+        // 系统强调色（DWM colorization）；取不到退化白色
         var wc = new NativeMethods.WndClass
         {
             lpfnWndProc = WndProc,
             hInstance = NativeMethods.GetModuleHandle(null),
             lpszClassName = ClassName,
             style = 0,
-            hbrBackground = NativeMethods.CreateSolidBrush(0x00FF9D5B),
+            hbrBackground = NativeMethods.CreateSolidBrush(GetSystemAccentColorRef()),
         };
         NativeMethods.RegisterClass(ref wc);
         _classRegistered = true;
+    }
+
+    /// <summary>DwmGetColorizationColor 返回 0xAARRGGBB，转换为 GDI COLORREF（0x00BBGGRR）。</summary>
+    internal static uint GetSystemAccentColorRef()
+    {
+        try
+        {
+            if (NativeMethods.DwmGetColorizationColor(out uint argb, out _) == 0)
+            {
+                uint r = (argb >> 16) & 0xFF, g = (argb >> 8) & 0xFF, b = argb & 0xFF;
+                return (b << 16) | (g << 8) | r;
+            }
+        }
+        catch
+        {
+            // 取不到用白色
+        }
+        return 0x00FFFFFF;
     }
 
     private static void PumpMessages()
@@ -145,6 +163,9 @@ internal static partial class NativeMethods
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool SetLayeredWindowAttributes(IntPtr hwnd, uint crKey, byte bAlpha, uint dwFlags);
+
+    [DllImport("dwmapi.dll")]
+    internal static extern int DwmGetColorizationColor(out uint colorization, [MarshalAs(UnmanagedType.Bool)] out bool opaqueBlend);
 
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]

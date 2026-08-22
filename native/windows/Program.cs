@@ -130,7 +130,7 @@ internal static class Program
         return 0;
     }
 
-    private static void WriteDiagLog(string msg)
+    internal static void WriteDiagLog(string msg)
     {
         try
         {

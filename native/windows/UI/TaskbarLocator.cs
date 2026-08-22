@@ -25,6 +25,8 @@ public static class TaskbarLocator
             IsBackground = true,
             Name = "appshot-taskbar-locate",
         };
+        // System.Windows.Automation（UIA COM）要求 STA 线程，MTA 下查找会失败
+        worker.SetApartmentState(ApartmentState.STA);
         worker.Start();
         worker.Join(timeoutMs);
         return worker.IsAlive ? null : result;

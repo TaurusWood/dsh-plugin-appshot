@@ -43,6 +43,7 @@ public static class CaptureFlyin
     {
         if (Interlocked.CompareExchange(ref _busy, 1, 0) != 0) return;
         var t = new Thread(() => Run(png, targetBounds)) { IsBackground = true };
+        t.SetApartmentState(ApartmentState.STA);
         t.Start();
     }
 
@@ -55,9 +56,14 @@ public static class CaptureFlyin
         try
         {
             using var source = Decode(png);
-            if (source == null) return;
+            if (source == null)
+            {
+                Program.WriteDiagLog("flyin: decode failed");
+                return;
+            }
 
-            var (endCenter, _) = ResolveEndpoint(targetBounds);
+            var (endCenter, fallback) = ResolveEndpoint(targetBounds);
+            Program.WriteDiagLog($"flyin: endpoint=({(int)endCenter.X},{(int)endCenter.Y}) fallback={fallback}");
 
             // 初始尺寸：目标窗口 30%，宽限制在 StartMaxWidth 内，保持宽高比
             double scale = Math.Min(0.3, (double)StartMaxWidth / Math.Max(1, targetBounds.Width));
@@ -72,12 +78,20 @@ public static class CaptureFlyin
                 WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW | WS_EX_TOPMOST,
                 ClassName, "", WS_POPUP,
                 0, 0, 1, 1, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
-            if (hwnd == IntPtr.Zero) return;
+            if (hwnd == IntPtr.Zero)
+            {
+                Program.WriteDiagLog("flyin: CreateWindowEx failed: " + Marshal.GetLastWin32Error());
+                return;
+            }
             NativeMethods.ShowWindow(hwnd, 4 /* SW_SHOWNOACTIVATE */);
 
             // 预生成全部帧：先把源图缩到起始尺寸（避免每帧从数千像素宽的原图重采样）
             using var mid = RenderScaled(source, startW, startH);
-            if (mid == null) return;
+            if (mid == null)
+            {
+                Program.WriteDiagLog("flyin: prerender start-size failed");
+                return;
+            }
             int frameCount = FlyinDurationMs / FrameIntervalMs;
             for (int i = 0; i < frameCount; i++)
             {
@@ -86,13 +100,14 @@ public static class CaptureFlyin
                 if (f == null) break;
                 frames.Add(f);
             }
+            Program.WriteDiagLog($"flyin: frames={frames.Count} startW={startW} startH={startH}");
             if (frames.Count == 0) return;
 
             Play(hwnd, frames);
         }
-        catch
+        catch (Exception ex)
         {
-            // 动画失败静默忽略
+            Program.WriteDiagLog($"flyin: aborted: {ex.Message}");
         }
         finally
         {
@@ -126,9 +141,14 @@ public static class CaptureFlyin
                 var size = new Size(f.W, f.H);
                 var src = new Point(0, 0);
                 blend.SourceConstantAlpha = f.Alpha;
-                NativeMethods.UpdateLayeredWindow(
+                bool ok = NativeMethods.UpdateLayeredWindow(
                     hwnd, IntPtr.Zero, ref pos, ref size, memDc, ref src, 0, ref blend, 2 /* ULW_ALPHA */);
                 NativeMethods.SelectObject(memDc, old);
+                if (i == 0)
+                {
+                    Program.WriteDiagLog($"flyin: first-frame ULW ok={ok} err={Marshal.GetLastWin32Error()} pos=({pos.X},{pos.Y}) size=({size.Width}x{size.Height})");
+                }
+                if (!ok) continue;
 
                 PumpMessages();
                 NativeMethods.DwmFlush();
@@ -195,11 +215,14 @@ public static class CaptureFlyin
     {
         try
         {
+            // GDI+ 要求流在 Image 存活期间保持打开；复制为独立位图后即可安全释放流
             using var ms = new MemoryStream(png);
-            return Image.FromStream(ms);
+            using var img = Image.FromStream(ms);
+            return new Bitmap(img);
         }
-        catch
+        catch (Exception ex)
         {
+            Program.WriteDiagLog($"flyin: decode exception: {ex.Message}");
             return null;
         }
     }
