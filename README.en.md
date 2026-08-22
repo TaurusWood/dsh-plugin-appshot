@@ -42,10 +42,14 @@ Currently supports **macOS 14+** (double ⌘ Command by default) and **Windows 1
 
 ## Usage
 
-1. In any app (Chrome, VS Code, Finder, Terminal…), **press Left ⌘ and Right ⌘ together** — you capture exactly the **one window** in front of you, not the whole screen.
-2. After the screenshot lands on disk, the DSH window is activated and focused (capture-then-activate — DSH can never appear in its own screenshot; window activation applies to the DSH desktop app only — under `dsh web` the image still lands in the composer, just without the window activation).
+1. In any app (Chrome, VS Code, Finder / Notepad, Terminal…), press the global hotkey — **Left ⌘ + Right ⌘ together on macOS**, **Left Ctrl + Right Ctrl together on Windows** (remappable in the settings panel) — you capture exactly the **one window** in front of you, not the whole screen.
 
-| Before trigger (frontmost app window) | After trigger (captured & mounted into Composer) |
+    **What happens next differs per platform:**
+
+    - **macOS**: after the screenshot lands on disk, the DSH window is activated and focused (capture-then-activate — DSH can never appear in its own screenshot; window activation applies to the DSH desktop app only — under `dsh web` the image still lands in the composer, just without the window activation).
+    - **Windows**: **DSH is never activated** — the screenshot silently lands in the current session's input box without interrupting your work; success is signaled by a shutter sound and a fly-in animation (both disableable), and failures surface in a **no-focus-stealing** lightweight toast.
+
+| Before trigger (frontmost app window; screenshots show macOS) | After trigger (captured & mounted into Composer) |
 | :---: | :---: |
 | ![Before trigger](docs/assets/before-double-command.png) | ![After trigger](docs/assets/after-double-command.png) |
 
@@ -59,13 +63,27 @@ Currently supports **macOS 14+** (double ⌘ Command by default) and **Windows 1
 
 ## Features
 
-- **Global double-Command hotkey**: Left ⌘ + Right ⌘ state machine (the same trigger Codex Appshots uses), with a 1s debounce/cooldown; responds even while DSH is in the background or minimized.
-- **Precise single-window capture**: only the frontmost window itself (transparent layers, shadows and tooltips filtered out), built on ScreenCaptureKit, Retina resolution preserved; on multi-display setups only the target window's screen is captured.
+**Shared across platforms**
+
+- **Precise single-window capture**: only the **one** window you're looking at — never the whole screen, other windows, or the desktop.
+- **Composer draft mounting**: screenshots land in the current session's input draft automatically and are sent with your message; trigger repeatedly to append more.
+- **No leftovers**: staging temp files are cleaned in every success/failure branch under a single-owner contract; orphans from crashed runs are swept on plugin startup.
+
+**macOS**
+
+- **Global double-Command hotkey**: Left ⌘ + Right ⌘ state machine (the same trigger Codex Appshots uses), with debounce/cooldown; responds even while DSH is in the background or minimized.
+- **ScreenCaptureKit single-window capture**: transparent layers, shadows and tooltips filtered out, Retina resolution preserved; on multi-display setups only the target window's screen is captured.
 - **Capture-then-activate (no self-capture)**: the DSH window is activated and brought to front only after the screenshot has been taken and written to disk — no race condition that could "screenshot DSH itself".
-- **Automatic composer mounting**: the host persists the screenshot as a DSH Attachment, pushes it over a self-hosted SSE channel, and the client module mounts it into the active session's composer draft and focuses the input.
-- **Append multiple shots**: trigger repeatedly to stack several screenshots in one draft.
+- **SSE push mounting**: the host persists the screenshot via `saveImage` as a DSH Attachment, pushes it over a self-hosted SSE channel, and the client module mounts it into the active session and focuses the input.
 - **Permission feedback**: missing Screen Recording / Accessibility permissions trigger the system authorization prompt, plus a system notification (`UNUserNotificationCenter`) with the failure reason.
-- **No leftovers**: staging temp files are deleted immediately after `saveImage` succeeds; orphan files from crashed runs are cleaned up on plugin startup.
+
+**Windows**
+
+- **Double-Ctrl hotkey (remappable)**: Left + Right Ctrl by default; switch to other Ctrl/Alt/Shift combinations in the DSH settings panel, persisted across restarts.
+- **Topmost-window-on-cursor's-monitor targeting**: captures the topmost window on the monitor under the cursor; explicitly refuses (with a toast) when the frontmost window is DSH itself, the desktop, the taskbar, or an invisible/spanning window — no accidental captures.
+- **Bring-to-front + fallback two-stage capture**: a visible-content backup is taken first, then re-captured after a regular bring-to-front; if activation fails, the backup is used so "what you saw is what you get".
+- **Silent delivery (inverse anti-self-capture design)**: DSH is **never activated or focused**; the screenshot travels through an in-memory Node pending buffer and a directed HTTP long poll to the locked client, mounts into the composer, and reports back a `MOUNTED` confirmation.
+- **Non-intrusive feedback**: shutter sound, border flash and thumbnail fly-in animation (each disableable); all failure hints are no-activate toasts that never steal focus.
 
 ## How it works
 

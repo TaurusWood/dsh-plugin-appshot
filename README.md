@@ -42,10 +42,14 @@ DSH 版的「[Codex Appshots](https://developers.openai.com/codex/appshots)」�
 
 ## 使用
 
-1. 在任意应用（Chrome、VS Code、Finder、Terminal…）中**同时按下左 ⌘ 与右 ⌘**——截的就是你眼前正在看的这**一个窗口**，不是整屏；
-2. 截图完成落盘后 DSH 窗口自动唤起并聚焦（先截后唤，不会截到 DSH 自身；窗口唤起仅对 DSH 桌面端生效，`dsh web` 下截图仍会挂入 Composer，只是不唤起窗口）；
+1. 在任意应用（Chrome、VS Code、Finder / 记事本、Terminal…）中按下全局快捷键——**macOS 同时按左 ⌘ 与右 ⌘**，**Windows 同时按左 Ctrl 与右 Ctrl**（可在设置面板自定义）——截的就是你眼前正在看的这**一个窗口**，不是整屏；
 
-| 触发前（正在操作的前台窗口） | 触发后（自动截取并挂入 Composer） |
+    **接下来两个平台的表现不同：**
+
+    - **macOS**：截图完成落盘后 DSH 窗口自动唤起并聚焦（先截后唤，不会截到 DSH 自身；窗口唤起仅对 DSH 桌面端生效，`dsh web` 下截图仍会挂入 Composer，只是不唤起窗口）；
+    - **Windows**：**DSH 保持原样、不会被激活**——截图静默进入当前会话输入框，不打断你手头的工作；成功时以快门音与缩略图飞入动画反馈（可在设置中关闭），失败时弹出**不抢焦点**的轻量浮层提示原因。
+
+| 触发前（正在操作的前台窗口，截图为 macOS 示例） | 触发后（自动截取并挂入 Composer） |
 | :---: | :---: |
 | ![触发前](docs/assets/before-double-command.png) | ![触发后](docs/assets/after-double-command.png) |
 
@@ -59,13 +63,27 @@ DSH 版的「[Codex Appshots](https://developers.openai.com/codex/appshots)」�
 
 ## 特性
 
-- **全局双 Command 快捷键**：左 ⌘ + 右 ⌘ 组合状态机触发（与 Codex Appshots 同款），带 1s 冷却防抖，DSH 在后台/最小化时也能响应。
-- **单窗口精准截图**：只截前台窗口本身（过滤透明层、Shadow、Tooltip），基于 ScreenCaptureKit，保留 Retina 高清分辨率；多显示器下只截目标窗口所在屏幕。
+**双平台共有**
+
+- **单窗口精准截图**：只截你正在看的**一个**窗口，不是整屏、不含其他窗口与桌面。
+- **Composer 草稿挂载**：截图自动进入当前会话的输入框草稿，等你补充说明后随消息一起发送；可连续触发追加多张。
+- **无残留**：临时 Staging 文件按「单一 Owner」合同在所有成功/失败分支清理，插件启动时自动清扫崩溃遗留。
+
+**macOS**
+
+- **全局双 Command 快捷键**：左 ⌘ + 右 ⌘ 组合状态机触发（与 Codex Appshots 同款），带冷却防抖，DSH 在后台/最小化时也能响应。
+- **ScreenCaptureKit 单窗口截图**：过滤透明层、Shadow、Tooltip，保留 Retina 高清分辨率；多显示器下只截目标窗口所在屏幕。
 - **先截后唤（防自截）**：截图完成并落盘后，才由 Native Agent 唤起并置顶 DSH 主窗口，杜绝竞态导致「截到 DSH 自己」。
-- **Composer 自动挂载**：截图经宿主持久化为 DSH Attachment 后，通过自建 SSE 通道推送到客户端模块，自动挂到当前活跃 Session 的 Composer 草稿并聚焦输入框。
-- **连续追加**：多次触发可在一轮输入中追加多张截图附件。
+- **SSE 推送挂载**：截图经宿主 `saveImage` 持久化为 DSH Attachment 后，经自建 SSE 通道推送客户端，自动挂到活跃 Session 并聚焦输入框。
 - **权限反馈**：缺少 Screen Recording / Accessibility 权限时弹出系统授权引导，并用系统通知（`UNUserNotificationCenter`）提示失败原因。
-- **无残留**：临时 Staging 文件在 `saveImage` 成功后立即删除；插件启动时自动清理崩溃遗留的孤儿文件。
+
+**Windows**
+
+- **双 Ctrl 快捷键（可自定义）**：左右 Ctrl 同时按触发；可在 DSH 设置面板改为 Ctrl/Alt/Shift 左右键的其他组合，配置跨重启保留。
+- **鼠标屏最前窗口锁定**：截取鼠标所在显示器 Z 序最前的窗口；最前是 DSH 自身、桌面、任务栏或不可见/跨屏窗口时明确拒绝并提示，绝不误截。
+- **置前 + 降级两阶段截图**：先留存窗口可见内容备份，普通置前成功后重截；置前失败时降级使用备份，尽力保住「你看到的就是截到的」。
+- **静默交付（防自截反向设计）**：全程**不激活、不聚焦 DSH**；截图经 Node 内存 Pending 字节与定向 HTTP 长轮询交给锁定的客户端，挂入 Composer 后回报 `MOUNTED` 确认，不达不弃。
+- **无打扰反馈**：快门音、边框闪烁与缩略图飞入任务栏动画（均可关闭）；所有失败提示均为不抢焦点的 No-Activate 浮层。
 
 ## 工作原理
 
