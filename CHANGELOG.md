@@ -2,6 +2,13 @@
 
 [English](./CHANGELOG.md) | [简体中文](./CHANGELOG.zh-CN.md)
 
+## [0.3.1](https://github.com/TaurusWood/dsh-plugin-appshot/compare/v0.3.0...v0.3.1) (2026-08-22)
+
+
+### Bug Fixes
+
+* **ci:** fix yaml quoting syntax in release workflow ([9369c72](https://github.com/TaurusWood/dsh-plugin-appshot/commit/9369c72c3dd11a19eb958576373716242b5ad775))
+
 # [0.3.0](https://github.com/TaurusWood/dsh-plugin-appshot/compare/v0.2.0...v0.3.0) (2026-08-22)
 
 

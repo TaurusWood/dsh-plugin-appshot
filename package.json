@@ -1,6 +1,6 @@
 {
   "name": "dsh-plugin-appshot",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "dsh-plugin-appshot — a DeepSeek Harness plugin for macOS and Windows context screenshot capture.",
   "license": "MIT",
   "author": "TaurusWood",
