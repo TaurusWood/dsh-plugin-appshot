@@ -1,11 +1,11 @@
 # dsh-plugin-appshot
 
-> macOS 全局快捷键「一键截图**当前窗口**」，自动作为图片上下文挂入 DeepSeek Harness (DSH) 的 Composer —— 把当前工作窗口零摩擦交给 Agent。
+> macOS / Windows 全局快捷键「一键截图**当前窗口**」，自动作为图片上下文挂入 DeepSeek Harness (DSH) 的 Composer —— 把当前工作窗口零摩擦交给 Agent。
 
 [English](README.en.md) · [中文](README.md) · [Changelog](CHANGELOG.md) · [更新日志](CHANGELOG.zh-CN.md)
 
 ![macOS](https://img.shields.io/badge/macOS-14%2B-333333?logo=apple&logoColor=white)
-![Windows](https://img.shields.io/badge/Windows-%E5%BC%80%E5%8F%91%E4%B8%AD-9cf)
+![Windows](https://img.shields.io/badge/Windows-10%2B-0078D4?logo=windows)
 ![DSH](https://img.shields.io/badge/DeepSeek%20Harness-0.1.0--rc.6-4f46e5)
 ![npm](https://img.shields.io/npm/v/dsh-plugin-appshot)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -16,9 +16,9 @@
 dsh plugin --profile web add dsh-plugin-appshot
 ```
 
-- npm 包为**预构建产物**：宿主插件 + 客户端模块 + Native Agent 已全部打包，**无需本地编译、无需构建授权**；
+- npm 包为**预构建产物**：宿主插件 + 客户端模块 + 双平台 Native Agent（macOS `.app` 与 Windows 自包含单文件 `.exe`）已全部打包，**无需本地编译、无需构建授权**；
 - 安装后**重启 dsh**，启动日志出现 `[dsh-plugin-appshot] plugin applied successfully`、`native agent ready` 即加载成功；
-- 首次触发截图时 macOS 会弹出授权引导，需授予**屏幕录制**与**辅助功能**权限（见[权限](#权限)）。
+- macOS 首次触发截图时会弹出授权引导，需授予**屏幕录制**与**辅助功能**权限（见[权限](#权限)）；Windows 无需额外授权。
 
 > 从源码安装（开发/贡献者）：在插件目录 `pnpm install && pnpm build && pnpm build:native`，然后在插件**父目录**执行 `dsh plugin --profile <name> add ./dsh-plugin-appshot`（`dsh plugin add` 的相对路径锚定调用目录）。
 
@@ -38,7 +38,7 @@ DSH 版的「[Codex Appshots](https://developers.openai.com/codex/appshots)」�
 按下 左⌘+右⌘  →  截取当前前台窗口  →  截图挂入 Composer  →  输入描述并 Send
 ```
 
-目前支持 **macOS 14+**；**Windows 版本正在开发中**。
+目前支持 **macOS 14+**（默认双 ⌘ Command）与 **Windows 10 19041+**（默认双 Ctrl，可在设置面板自定义修饰键组合）。
 
 ## 使用
 
@@ -108,27 +108,30 @@ DSH 版的「[Codex Appshots](https://developers.openai.com/codex/appshots)」�
 
 ## 限制
 
-- 目前**仅支持 macOS 14+**；**Windows 版本正在开发中**（计划基于 Win32 / Windows.Graphics.Capture）；WebUI 暂不支持（浏览器沙箱无法获取全局快捷键与跨应用置顶）。
-- 窗口唤起仅对 DSH 桌面端（macOS）生效；`dsh web` 下截图仍可入 Composer，但不唤起/置顶窗口。
+- 支持 **macOS 14+** 与 **Windows 10 19041+**（自包含单文件 Agent，无需安装 .NET 运行时）；WebUI 暂不支持（浏览器沙箱无法获取全局快捷键或跨应用置顶）。
+- 窗口唤起仅对 DSH 桌面端（macOS）生效；`dsh web` 下截图仍可入 Composer，但不唤起/置顶窗口；Windows 按「防自截」设计不唤起 DSH，截图静默进入输入框。
 - 不含区域框选、全屏截图、图片标注、OCR 与历史图库管理（均为后续规划）。
-- 快捷键默认为双 Command，暂无可视化配置面板。
+- 快捷键：macOS 默认双 Command；Windows 默认双 Ctrl，可在 DSH 设置 → 截图捕获 中自定义修饰键组合，并开关快门音与截图动画（配置跨重启保留）。
 
 ## 开发
 
 ```text
-src/                 宿主插件（Cordis apply(ctx) 入口 + agent/ingest/sse/staging/ipc/client 模块）
+src/                 宿主插件（Cordis apply(ctx) 入口 + windows/macos 交付 + client 模块）
 native/macos/        Swift Native Agent（ScreenCaptureKit + 双 Command 状态机）
-docs/                requirements.md（PRD）/ technical.md（技术方案）/ tasks.md（阶段验收）
+native/windows/      C# Native Agent（Win32 低级键盘钩子 + GDI 双阶段截图）
+docs/                requirements / technical（分平台）/ tasks / api-grounded-review
 tests/               各 Phase 契约测试（node --test）
 ```
 
 常用命令：
 
 ```sh
-pnpm build          # esbuild 打包宿主插件与客户端模块 → dist/
-pnpm typecheck      # tsc --noEmit
-pnpm test           # 契约测试（DSH_DISABLE_AGENT_SPAWN=1 避免拉起真实 Agent）
-pnpm build:native   # 构建 Appshot Agent.app
+pnpm build                  # esbuild 打包宿主插件与客户端模块 → dist/
+pnpm typecheck              # tsc --noEmit
+pnpm test                   # 契约测试（DSH_DISABLE_AGENT_SPAWN=1 避免拉起真实 Agent）
+pnpm build:native           # 构建 Appshot Agent.app（macOS）
+pnpm build:native:windows   # dotnet publish 自包含单文件 exe → native/windows/bin/win-x64/（Windows）
+pnpm test:native            # Windows Native 单测（dotnet test）
 
 # Native 诊断（在 native/macos 内）
 swift build && .build/debug/appshot-macos --list-windows          # 列出可捕获窗口
@@ -137,7 +140,7 @@ swift build && .build/debug/appshot-macos --list-windows          # 列出可捕
 
 依赖约束：`@deepseek-ai/dsh-tools` 与 `@deepseek-ai/cordis` 均为 peerDependencies（宿主提供；代码中只 `import type`，运行时由宿主注入 `ctx`）；版本锁定 `0.1.0-rc.6` 线（npm `latest` 是过期 0.0.1-rc.1，勿用 `npm i` 覆盖）。
 
-发布：`pnpm publish`（`prepack` 会自动执行 `pnpm build && pnpm build:native`，产物含 dist、cordis.patch.yml 与预构建的 `Appshot Agent.app`，用户安装无需任何构建授权）。
+发布（technical-windows.md §7.4）：tag 触发 GitHub Actions 双 runner——macOS 构建 `Appshot Agent.app`、Windows 构建 `appshot-win-x64.exe`，装配机还原两端产物后 `npm publish`（`prepack` 平台感知：本机构建 Native + `CI` 环境强制双端产物 Gate，缺一即阻断）。本地 `pnpm pack` 仅产出单平台包，不作为正式发布源。
 
 ## License
 

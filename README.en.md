@@ -1,11 +1,11 @@
 # dsh-plugin-appshot
 
-> A macOS global-hotkey "one-shot screenshot of the **current window**" that drops the image into the DeepSeek Harness (DSH) composer as context — hand your current working window to the agent with zero friction.
+> A macOS / Windows global-hotkey "one-shot screenshot of the **current window**" that drops the image into the DeepSeek Harness (DSH) composer as context — hand your current working window to the agent with zero friction.
 
 [English](README.en.md) · [中文](README.md) · [Changelog](CHANGELOG.md) · [更新日志](CHANGELOG.zh-CN.md)
 
 ![macOS](https://img.shields.io/badge/macOS-14%2B-333333?logo=apple&logoColor=white)
-![Windows](https://img.shields.io/badge/Windows-WIP-9cf)
+![Windows](https://img.shields.io/badge/Windows-10%2B-0078D4?logo=windows)
 ![DSH](https://img.shields.io/badge/DeepSeek%20Harness-0.1.0--rc.6-4f46e5)
 ![npm](https://img.shields.io/npm/v/dsh-plugin-appshot)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -16,9 +16,9 @@
 dsh plugin --profile web add dsh-plugin-appshot
 ```
 
-- The npm package ships **prebuilt artifacts** — host plugin + client module + Native Agent bundled together; **no local compilation, no build approval** needed.
+- The npm package ships **prebuilt artifacts** — host plugin + client module + Native Agents for both platforms (the macOS `.app` and a self-contained single-file Windows `.exe`) bundled together; **no local compilation, no build approval** needed.
 - **Restart dsh** after installing; you're ready when the startup log shows `[dsh-plugin-appshot] plugin applied successfully` and `native agent ready`.
-- On first trigger, macOS will ask for two permissions: **Screen Recording** and **Accessibility** (see [Permissions](#permissions)).
+- On first trigger, macOS will ask for two permissions: **Screen Recording** and **Accessibility** (see [Permissions](#permissions)); Windows needs no extra permission grants.
 
 > Installing from source (developers/contributors): run `pnpm install && pnpm build && pnpm build:native` inside the plugin directory, then run `dsh plugin --profile <name> add ./dsh-plugin-appshot` from its **parent** directory (`dsh plugin add` resolves relative paths against the invoking directory).
 
@@ -38,7 +38,7 @@ A DSH take on "[Codex Appshots](https://developers.openai.com/codex/appshots)": 
 Press Left ⌘ + Right ⌘  →  capture frontmost window  →  image lands in composer  →  describe and Send
 ```
 
-Currently supports **macOS 14+**; a **Windows version is in development**.
+Currently supports **macOS 14+** (double ⌘ Command by default) and **Windows 10 19041+** (double Ctrl by default, remappable in the settings panel).
 
 ## Usage
 
@@ -108,27 +108,30 @@ If you deny, the capture is aborted with a system notification; re-grant in Syst
 
 ## Limitations
 
-- Currently **macOS 14+ only**; a **Windows version is in development** (planned on Win32 / Windows.Graphics.Capture); WebUI is not supported (a browser sandbox can't access global hotkeys or cross-app activation).
-- Window activation applies to the DSH desktop app (macOS) only; under `dsh web` screenshots still land in the composer, but the window is not activated/brought to front.
+- Supports **macOS 14+** and **Windows 10 19041+** (self-contained single-file agent — no .NET runtime install needed); WebUI is not supported (a browser sandbox can't access global hotkeys or cross-app activation).
+- Window activation applies to the DSH desktop app (macOS) only; under `dsh web` screenshots still land in the composer, but the window is not activated/brought to front; Windows follows the anti-self-capture design and never activates DSH — screenshots silently land in the composer input.
 - No region selection, full-screen capture, image annotation, OCR, or screenshot history (all on the roadmap).
-- The hotkey is fixed to double-Command; no visual configuration panel yet.
+- Hotkeys: double-Command by default on macOS; double-Ctrl by default on Windows, remappable in DSH Settings → Screenshot Capture, which also toggles the shutter sound and capture animation (settings persist across restarts).
 
 ## Development
 
 ```text
-src/                 Host plugin (Cordis apply(ctx) entry + agent/ingest/sse/staging/ipc/client modules)
+src/                 Host plugin (Cordis apply(ctx) entry + windows/macos delivery + client modules)
 native/macos/        Swift Native Agent (ScreenCaptureKit + double-Command state machine)
-docs/                requirements.md (PRD) / technical.md (design) / tasks.md (phase acceptance)
+native/windows/      C# Native Agent (Win32 low-level keyboard hook + two-stage GDI capture)
+docs/                requirements / technical (per-platform) / tasks / api-grounded-review
 tests/               Phase contract tests (node --test)
 ```
 
 Common commands:
 
 ```sh
-pnpm build          # esbuild bundle host plugin + client module → dist/
-pnpm typecheck      # tsc --noEmit
-pnpm test           # contract tests (DSH_DISABLE_AGENT_SPAWN=1 to avoid spawning the real agent)
-pnpm build:native   # build Appshot Agent.app
+pnpm build                  # esbuild bundle host plugin + client module → dist/
+pnpm typecheck              # tsc --noEmit
+pnpm test                   # contract tests (DSH_DISABLE_AGENT_SPAWN=1 to avoid spawning the real agent)
+pnpm build:native           # build Appshot Agent.app (macOS)
+pnpm build:native:windows   # dotnet publish self-contained single-file exe → native/windows/bin/win-x64/ (Windows)
+pnpm test:native            # Windows native unit tests (dotnet test)
 
 # Native diagnostics (inside native/macos)
 swift build && .build/debug/appshot-macos --list-windows          # list capturable windows
@@ -137,7 +140,7 @@ swift build && .build/debug/appshot-macos --list-windows          # list captura
 
 Dependency notes: `@deepseek-ai/dsh-tools` and `@deepseek-ai/cordis` are peerDependencies (provided by the host; `import type` only — `ctx` is injected at runtime); versions stay pinned to the `0.1.0-rc.6` line (npm `latest` is a stale 0.0.1-rc.1 — don't `npm i` over it).
 
-Publishing: `pnpm publish` (`prepack` automatically runs `pnpm build && pnpm build:native`; the artifact contains `dist`, `cordis.patch.yml` and the prebuilt `Appshot Agent.app`, so users install without any build approval).
+Publishing (technical-windows.md §7.4): a tag triggers the two-runner GitHub Actions workflow — macOS builds `Appshot Agent.app`, Windows builds `appshot-win-x64.exe`; the assemble job restores both artifacts and runs `npm publish` (`prepack` is platform-aware: it builds the native agent for the current platform, and in CI it enforces a both-artifacts gate that blocks the release if either is missing). A local `pnpm pack` yields a single-platform package and is not a release source.
 
 ## License
 
