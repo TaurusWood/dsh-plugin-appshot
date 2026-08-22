@@ -21,6 +21,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { WindowsCaptureState } from './helpers/windows-types.ts'
 import { WindowsCaptureStateMachine } from '../src/windows/state-machine.ts'
+import type { HttpRequestLike, HttpResponseLike, WindowsWebServerLike } from '../src/windows/http-routes.ts'
 
 /**
  * 生产状态机的测试适配包装：保持原 createNodeCaptureManager 方法面，
@@ -199,3 +200,75 @@ test('W3.4 PENDING_ACK 超时守卫：长期未 ACK 自愈为 cancelled，后续
   assert.equal(accepted.accepted, true)
 })
 
+test('W3.5 delivery-result：NO_SESSION 允许空 targetSessionId，其余状态仍拒绝非法 sessionId', async () => {
+  const machine = new WindowsCaptureStateMachine()
+  machine.setLastActiveClient('client-inst-1', null)
+  // 无会话场景：IN_FLIGHT → PENDING_ACK（targetSessionId = null）
+  machine.onCaptureStarted('11111111-1111-4111-8111-111111111111', 1000)
+  machine.onAppshotReceived('11111111-1111-4111-8111-111111111111', new Uint8Array([1]))
+
+  const registered: Array<{ path: string; handler: (req: HttpRequestLike, res: HttpResponseLike) => void }> = []
+  const fakeWebServer: WindowsWebServerLike = {
+    host: '127.0.0.1',
+    register(route) {
+      registered.push(route)
+      return () => {}
+    },
+  }
+  const { registerWindowsRoutes } = await import('../src/windows/http-routes.ts')
+  registerWindowsRoutes({ webServer: fakeWebServer }, { machine })
+
+  const deliveryRoute = registered.find((r) => r.path === '/plugins/appshot/delivery-result')
+  assert.ok(deliveryRoute, 'delivery-result route registered')
+
+  const postDelivery = async (body: unknown) => {
+    const chunks = Buffer.from(JSON.stringify(body))
+    let status = 0
+    let responseBody = ''
+    await new Promise<void>((resolve) => {
+      const req = {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        on(event: string, cb: (chunk?: Buffer) => void) {
+          if (event === 'data' && chunks.length > 0) cb(chunks)
+          if (event === 'end') {
+            cb()
+            resolve()
+          }
+        },
+      }
+      const res = {
+        writeHead(code: number) {
+          status = code
+        },
+        end(text: string) {
+          responseBody = text
+        },
+      }
+      deliveryRoute.handler(req, res)
+    })
+    // 等待 async handler 完成
+    await new Promise((r) => setTimeout(r, 20))
+    return { status, responseBody }
+  }
+
+  // NO_SESSION + 空串：200 HELD_PENDING（不再 400 拒绝，ACK 链路闭合）
+  const noSession = await postDelivery({
+    captureId: '11111111-1111-4111-8111-111111111111',
+    clientInstanceId: 'client-inst-1',
+    targetSessionId: '',
+    status: 'NO_SESSION',
+  })
+  assert.equal(noSession.status, 200)
+  assert.ok(noSession.responseBody.includes('HELD_PENDING'))
+  assert.equal(machine.getState().type, 'PENDING_ACK')
+
+  // MOUNTED + 空串：仍 400（防假 ACK 绕过会话校验）
+  const invalidMounted = await postDelivery({
+    captureId: '11111111-1111-4111-8111-111111111111',
+    clientInstanceId: 'client-inst-1',
+    targetSessionId: '',
+    status: 'MOUNTED',
+  })
+  assert.equal(invalidMounted.status, 400)
+})

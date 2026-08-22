@@ -170,6 +170,7 @@ export type WindowsDeliveryResultStatus = 'MOUNTED' | 'BUSY' | 'NO_SESSION' | 'S
 export interface WindowsDeliveryResultRequest {
   captureId: string
   clientInstanceId: string
+  /** NO_SESSION 状态时为空串（客户端无可上报的会话），其余状态必须为合法 sessionId。 */
   targetSessionId: string
   status: WindowsDeliveryResultStatus
 }

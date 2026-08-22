@@ -363,12 +363,8 @@ export function registerWindowsRoutes(ctx: { webServer?: WindowsWebServerLike },
             if (typeof body.animationEnabled === 'boolean') patch.animationEnabled = body.animationEnabled
             // 修饰键组合校验：枚举内 且 两键不同（Shift/Win 因系统副作用排除在池外）
             if (body.windowsHotkeys !== null && typeof body.windowsHotkeys === 'object') {
-              const hk = body.windowsHotkeys as { left?: unknown; right?: unknown }
-              if (
-                typeof hk.left === 'string' && typeof hk.right === 'string' &&
-                isModifierKey(hk.left) && isModifierKey(hk.right) && hk.left !== hk.right
-              ) {
-                patch.windowsHotkeys = { left: hk.left, right: hk.right }
+              if (isValidWindowsHotkeys(body.windowsHotkeys)) {
+                patch.windowsHotkeys = { ...body.windowsHotkeys }
               } else {
                 sendJson(res, 400, { error: 'INVALID_HOTKEYS' })
                 return
