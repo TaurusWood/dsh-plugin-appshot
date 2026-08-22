@@ -567,13 +567,15 @@ internal static class Program
         }
     }
 
-    /// <summary>修饰键名 → 虚拟键码；池子限定 lctrl/rctrl/lalt/ralt（Shift/Win 系统副作用排除）。</summary>
+    /// <summary>修饰键名 → 虚拟键码；池子限定 Ctrl/Alt/Shift 左右键（Win 因系统副作用排除）。</summary>
     private static int ModifierToVk(string name) => name switch
     {
         "lctrl" => Hotkey.DualCtrlStateMachine.VK_LCONTROL,
         "rctrl" => Hotkey.DualCtrlStateMachine.VK_RCONTROL,
         "lalt" => Hotkey.DualCtrlStateMachine.VK_LALT,
         "ralt" => Hotkey.DualCtrlStateMachine.VK_RALT,
+        "lshift" => Hotkey.DualCtrlStateMachine.VK_LSHIFT,
+        "rshift" => Hotkey.DualCtrlStateMachine.VK_RSHIFT,
         _ => 0,
     };
 }

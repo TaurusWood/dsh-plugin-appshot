@@ -127,7 +127,7 @@ function isDeliveryResultStatus(value: string): value is WindowsDeliveryResultSt
   return (deliveryStatuses as readonly string[]).includes(value)
 }
 
-const modifierKeys: readonly string[] = ['lctrl', 'rctrl', 'lalt', 'ralt']
+const modifierKeys: readonly string[] = ['lctrl', 'rctrl', 'lalt', 'ralt', 'lshift', 'rshift']
 
 function isModifierKey(value: string): value is WindowsModifierKey {
   return modifierKeys.includes(value)

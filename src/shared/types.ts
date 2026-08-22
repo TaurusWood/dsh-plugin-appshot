@@ -45,8 +45,8 @@ export interface AppshotConfig {
   animationEnabled?: boolean
 }
 
-/** Windows 触发键修饰键池（虚拟键 lctrl=0xA2 / rctrl=0xA3 / lalt=0xA4 / ralt=0xA5）。 */
-export type WindowsModifierKey = 'lctrl' | 'rctrl' | 'lalt' | 'ralt'
+/** Windows 触发键修饰键池（lctrl=0xA2 / rctrl=0xA3 / lalt=0xA4 / ralt=0xA5 / lshift=0xA0 / rshift=0xA1）；Win 因开始菜单副作用排除。 */
+export type WindowsModifierKey = 'lctrl' | 'rctrl' | 'lalt' | 'ralt' | 'lshift' | 'rshift'
 
 export interface WindowsHotkeys {
   left: WindowsModifierKey

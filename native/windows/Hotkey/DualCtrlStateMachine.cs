@@ -21,6 +21,8 @@ public sealed class DualCtrlStateMachine
     public const int VK_RCONTROL = 0xA3;
     public const int VK_LALT = 0xA4;
     public const int VK_RALT = 0xA5;
+    public const int VK_LSHIFT = 0xA0;
+    public const int VK_RSHIFT = 0xA1;
 
     private readonly long _combinationWindowMs;
     private readonly long _cooldownMs;

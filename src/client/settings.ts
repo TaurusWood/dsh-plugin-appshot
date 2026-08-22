@@ -3,7 +3,7 @@
  */
 
 import React, { useState, useEffect } from 'react'
-import type { AppshotConfig, WindowsHotkeys, WindowsModifierKey } from '../shared/types.ts'
+import type { AppshotConfig, WindowsModifierKey } from '../shared/types.ts'
 
 const h = React.createElement
 
@@ -12,9 +12,19 @@ const MODIFIER_LABELS: Record<WindowsModifierKey, string> = {
   rctrl: '右 Ctrl',
   lalt: '左 Alt',
   ralt: '右 Alt',
+  lshift: '左 Shift',
+  rshift: '右 Shift',
 }
 
-const MODIFIER_KEYS = Object.keys(MODIFIER_LABELS) as WindowsModifierKey[]
+/** event.code → 修饰键池（Win 键因开始菜单副作用排除，Shift 已知会切输入法，由用户自行取舍） */
+const MODIFIER_CODES: Record<string, WindowsModifierKey> = {
+  ControlLeft: 'lctrl',
+  ControlRight: 'rctrl',
+  AltLeft: 'lalt',
+  AltRight: 'ralt',
+  ShiftLeft: 'lshift',
+  ShiftRight: 'rshift',
+}
 
 const selectStyle: React.CSSProperties = {
   background: '#27272a',
@@ -89,18 +99,53 @@ export function AppshotSettingsSection() {
     }
   }
 
-  // Windows 自定义修饰键：换键时保证两键不同（另一侧已占用则忽略）
-  const updateHotkeySide = (side: 'left' | 'right', key: WindowsModifierKey) => {
-    const hotkeys: WindowsHotkeys =
-      side === 'left'
-        ? { left: key, right: config.windowsHotkeys?.right ?? 'rctrl' }
-        : { left: config.windowsHotkeys?.left ?? 'lctrl', right: key }
-    if (hotkeys.left === hotkeys.right) return
-    void handleUpdate({ windowsHotkeys: hotkeys })
-  }
-
   const isWin = config.platform === 'win32' || isWinClient
   const hotkeys = config.windowsHotkeys ?? { left: 'lctrl', right: 'rctrl' }
+
+  // 录键控件：点击进入录制 → 依次按住两个修饰键即完成录入（ESC / 失焦取消）
+  const [recording, setRecording] = useState(false)
+  const [pendingKey, setPendingKey] = useState<WindowsModifierKey | null>(null)
+
+  const cancelRecording = () => {
+    setRecording(false)
+    setPendingKey(null)
+  }
+
+  useEffect(() => {
+    if (!recording) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      if (e.code === 'Escape') {
+        cancelRecording()
+        return
+      }
+      const mod = MODIFIER_CODES[e.code]
+      if (!mod) return
+      if (pendingKey === null) {
+        setPendingKey(mod)
+        return
+      }
+      if (pendingKey === mod) return
+      void handleUpdate({ windowsHotkeys: { left: pendingKey, right: mod } })
+      cancelRecording()
+    }
+    const onKeyUp = (e: KeyboardEvent) => {
+      // 只按了一个键就松开：重置，等待重新按住两个键
+      if (pendingKey !== null && MODIFIER_CODES[e.code] === pendingKey) {
+        setPendingKey(null)
+      }
+    }
+    const onBlur = () => cancelRecording()
+    window.addEventListener('keydown', onKeyDown, true)
+    window.addEventListener('keyup', onKeyUp, true)
+    window.addEventListener('blur', onBlur)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown, true)
+      window.removeEventListener('keyup', onKeyUp, true)
+      window.removeEventListener('blur', onBlur)
+    }
+  }, [recording, pendingKey])
 
   return h('div', {
     style: {
@@ -158,32 +203,30 @@ export function AppshotSettingsSection() {
         h('div', null,
           h('div', { style: { fontWeight: 500, color: '#f4f4f5', marginBottom: '2px' } }, '触发快捷键'),
           h('div', { style: { fontSize: '12px', color: '#71717a' } }, '在任意应用前台触发窗口截屏的全局按键组合'),
-          // 自定义修饰键选择（仅 Windows 且选择自定义时展开；两键互斥）
+          // 录键控件（仅 Windows 且选择自定义时展开）
           isWin && config.shortcutMode === 'custom'
-            ? h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px' } },
-                h('select', {
-                  value: hotkeys.left,
-                  disabled: loading || saving,
-                  onChange: (e: React.ChangeEvent<HTMLSelectElement>) =>
-                    updateHotkeySide('left', e.target.value as WindowsModifierKey),
-                  style: selectStyle,
+            ? h('div', { style: { marginTop: '10px' } },
+                h('button', {
+                  onClick: () => (recording ? cancelRecording() : (setPendingKey(null), setRecording(true))),
+                  style: {
+                    background: recording ? '#3b82f6' : '#27272a',
+                    color: recording ? '#ffffff' : '#fafafa',
+                    border: '1px solid rgba(255, 255, 255, 0.12)',
+                    borderRadius: '8px',
+                    padding: '6px 14px',
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    outline: 'none',
+                  },
                 },
-                  ...MODIFIER_KEYS.map((k) =>
-                    h('option', { key: k, value: k, disabled: k === hotkeys.right }, MODIFIER_LABELS[k]),
-                  ),
+                  recording
+                    ? pendingKey
+                      ? `已录入「${MODIFIER_LABELS[pendingKey]}」，请按第二个修饰键…`
+                      : '请同时按住两个修饰键…（ESC 取消）'
+                    : `${MODIFIER_LABELS[hotkeys.left]} + ${MODIFIER_LABELS[hotkeys.right]}　点击修改`,
                 ),
-                h('span', { style: { color: '#71717a', fontSize: '12px' } }, '+'),
-                h('select', {
-                  value: hotkeys.right,
-                  disabled: loading || saving,
-                  onChange: (e: React.ChangeEvent<HTMLSelectElement>) =>
-                    updateHotkeySide('right', e.target.value as WindowsModifierKey),
-                  style: selectStyle,
-                },
-                  ...MODIFIER_KEYS.map((k) =>
-                    h('option', { key: k, value: k, disabled: k === hotkeys.left }, MODIFIER_LABELS[k]),
-                  ),
-                ),
+                h('div', { style: { fontSize: '12px', color: '#71717a', marginTop: '6px' } },
+                  '支持 Ctrl / Alt / Shift 左右键任意组合；不含 Win 键。含 Shift 的组合可能与输入法切换冲突，请自行取舍。'),
               )
             : null,
         ),
