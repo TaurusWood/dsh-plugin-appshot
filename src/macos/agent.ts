@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { chmodSync, statSync } from 'node:fs'
 import { createNdjsonParser } from './ipc.ts'
-import type { AppshotConfig, AppshotEvent } from './types.ts'
+import type { AppshotConfig, AppshotEvent } from '../shared/types.ts'
 
 export interface StartAgentOptions {
   command: string

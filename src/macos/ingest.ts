@@ -1,5 +1,5 @@
 import { readFile, unlink } from 'node:fs/promises'
-import type { ImageAttachmentRef, SaveImageInput } from './types.ts'
+import type { ImageAttachmentRef, SaveImageInput } from '../shared/types.ts'
 
 export interface AttachmentService {
   saveImage(input: SaveImageInput): Promise<ImageAttachmentRef>

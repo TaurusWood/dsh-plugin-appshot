@@ -21,7 +21,7 @@ import { registerWindowsRoutes, type WindowsWebServerLike } from './http-routes.
 import { startWindowsAgent, type WindowsAgentProcess } from './agent.ts'
 import { cleanOrphanWindowsStagingDirs, ingestWindowsScreenshot, writeInstanceLock } from './safe-ingest.ts'
 import type { WindowsNativeToNodeFrame } from './types.ts'
-import type { AppshotConfig } from '../types.ts'
+import type { AppshotConfig } from '../shared/types.ts'
 
 export interface WindowsHostContext {
   webServer?: WindowsWebServerLike

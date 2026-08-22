@@ -49,7 +49,7 @@ export interface WindowsWebServerLike {
   }): () => void
 }
 
-import type { AppshotConfig } from '../types.ts'
+import type { AppshotConfig } from '../shared/types.ts'
 
 export interface WindowsRoutesOptions {
   machine: WindowsCaptureStateMachine

@@ -1,4 +1,4 @@
-import type { ImageAttachmentRef } from './types.ts'
+import type { ImageAttachmentRef } from '../shared/types.ts'
 
 export interface AppshotReadyFrame {
   type: 'appshot/ready'

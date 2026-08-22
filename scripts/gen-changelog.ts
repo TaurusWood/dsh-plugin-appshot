@@ -28,7 +28,7 @@ if (!enContent.startsWith('# Changelog')) {
 writeFileSync(EN_PATH, enContent + '\n', 'utf-8')
 
 // 3. 翻译/转换生成中文版
-const SECTION_MAP = [
+const SECTION_MAP: Array<[RegExp, string]> = [
   [/### Bug Fixes/g, '### 🐛 问题修复 (Bug Fixes)'],
   [/### Features/g, '### 🚀 新特性 (Features)'],
   [/### Performance Improvements/g, '### ⚡ 性能优化 (Performance)'],

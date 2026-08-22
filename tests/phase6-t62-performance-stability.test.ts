@@ -20,13 +20,13 @@ import { join } from 'node:path'
 import { DUMMY_PNG, fileExists, makeTempDir, removeDir, stagingFileName, writeFileBytes } from './helpers/fs.ts'
 import { createMockCtx } from './helpers/mock-ctx.ts'
 
-const ingestReady = existsSync(new URL('../src/ingest.ts', import.meta.url))
+const ingestReady = existsSync(new URL('../src/macos/ingest.ts', import.meta.url))
 const skipReason = ingestReady
   ? false
   : 'T6.2 自动化部分依赖 src/ingest.ts（T4.2 未实现，落地后自动激活）'
 
 test('连续 10 次 ingestScreenshot：全部成功且无 Staging 残留（主流程）', { skip: skipReason }, async () => {
-  const { ingestScreenshot } = await import('../src/ingest.ts')
+  const { ingestScreenshot } = await import('../src/macos/ingest.ts')
   const dir = await makeTempDir()
   try {
     const ctx = createMockCtx()

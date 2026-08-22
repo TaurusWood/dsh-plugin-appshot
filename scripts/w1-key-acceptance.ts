@@ -1,6 +1,5 @@
 
-const { spawn } = await import('node:child_process')
-const { writeFileSync } = await import('node:fs')
+import { spawn, execSync } from 'node:child_process'
 
 // 1. 启动 exe（allow-injected + 测试 staging）
 const staging = process.env.TEMP + '\\dsh-appshot-keytest'
@@ -54,7 +53,6 @@ Start-Sleep -Milliseconds 150
 [KeySim]::KeyUp(0xA3)     # RCTRL up
 Write-Host "keys sent"
 `
-const { execSync } = await import('node:child_process')
 const psOut = execSync('powershell -NoProfile -Command ' + JSON.stringify(psScript), { encoding: 'utf8' })
 console.log('PS:', psOut.trim())
 

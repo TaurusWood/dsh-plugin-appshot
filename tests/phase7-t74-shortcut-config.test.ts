@@ -3,7 +3,7 @@
  */
 import { describe, test } from 'node:test'
 import assert from 'node:assert/strict'
-import type { AppshotConfig } from '../src/types.ts'
+import type { AppshotConfig } from '../src/shared/types.ts'
 
 describe('T7.4 快捷键与偏好配置及即时生效', () => {
   test('配置模型包含 shortcutMode / soundEnabled / animationEnabled 字段（主流程）', () => {

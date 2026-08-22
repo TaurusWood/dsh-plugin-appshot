@@ -6,7 +6,7 @@ const isMac = process.platform === 'darwin'
 
 const explicitArg = process.argv[2]
 
-let testPatterns = []
+let testPatterns: string[] = []
 if (explicitArg === '--win' || explicitArg === '--windows' || (isWindows && !explicitArg)) {
   testPatterns = ['tests/phase-w*.test.ts', 'tests/phase7-*.test.ts']
 } else if (explicitArg === '--mac' || explicitArg === '--macos' || (isMac && !explicitArg)) {

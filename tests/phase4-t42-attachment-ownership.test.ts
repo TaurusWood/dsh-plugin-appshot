@@ -22,8 +22,8 @@ import { join } from 'node:path'
 import { DUMMY_PNG, fileExists, makeTempDir, removeDir, stagingFileName, writeFileBytes } from './helpers/fs.ts'
 import { createMockCtx } from './helpers/mock-ctx.ts'
 
-const ingestReady = existsSync(new URL('../src/ingest.ts', import.meta.url))
-const stagingReady = existsSync(new URL('../src/staging.ts', import.meta.url))
+const ingestReady = existsSync(new URL('../src/macos/ingest.ts', import.meta.url))
+const stagingReady = existsSync(new URL('../src/macos/staging.ts', import.meta.url))
 const skipIngest = ingestReady
   ? false
   : 'T4.2 未实现：缺少 src/ingest.ts（落地后自动激活；模块名不同请同步本文件）'
@@ -32,7 +32,7 @@ const skipStaging = stagingReady
   : 'T4.2 未实现：缺少 src/staging.ts（落地后自动激活；模块名不同请同步本文件）'
 
 test('主流程：字节原样传入 saveImage，成功后立即 unlink', { skip: skipIngest }, async () => {
-  const { ingestScreenshot } = await import('../src/ingest.ts')
+  const { ingestScreenshot } = await import('../src/macos/ingest.ts')
   const dir = await makeTempDir()
   try {
     const imagePath = await writeFileBytes(dir, stagingFileName('aaa'), DUMMY_PNG)
@@ -53,7 +53,7 @@ test('主流程：字节原样传入 saveImage，成功后立即 unlink', { skip
 })
 
 test('常规边界：saveImage 失败仍必须 unlink', { skip: skipIngest }, async () => {
-  const { ingestScreenshot } = await import('../src/ingest.ts')
+  const { ingestScreenshot } = await import('../src/macos/ingest.ts')
   const dir = await makeTempDir()
   try {
     const imagePath = await writeFileBytes(dir, stagingFileName('fail'), DUMMY_PNG)
@@ -70,7 +70,7 @@ test('常规边界：saveImage 失败仍必须 unlink', { skip: skipIngest }, as
 })
 
 test('常规边界：源文件缺失时拒绝且不调用 saveImage', { skip: skipIngest }, async () => {
-  const { ingestScreenshot } = await import('../src/ingest.ts')
+  const { ingestScreenshot } = await import('../src/macos/ingest.ts')
   const dir = await makeTempDir()
   try {
     const ctx = createMockCtx()
@@ -82,7 +82,7 @@ test('常规边界：源文件缺失时拒绝且不调用 saveImage', { skip: sk
 })
 
 test('常规边界：空文件仍透传且清理', { skip: skipIngest }, async () => {
-  const { ingestScreenshot } = await import('../src/ingest.ts')
+  const { ingestScreenshot } = await import('../src/macos/ingest.ts')
   const dir = await makeTempDir()
   try {
     const imagePath = await writeFileBytes(dir, stagingFileName('empty'), new Uint8Array(0))
@@ -97,7 +97,7 @@ test('常规边界：空文件仍透传且清理', { skip: skipIngest }, async (
 })
 
 test('主流程：cleanOrphanStagingFiles 只清理 dsh-appshot-*.png', { skip: skipStaging }, async () => {
-  const { cleanOrphanStagingFiles } = await import('../src/staging.ts')
+  const { cleanOrphanStagingFiles } = await import('../src/macos/staging.ts')
   const dir = await makeTempDir()
   try {
     await writeFileBytes(dir, stagingFileName('a'), DUMMY_PNG)
@@ -114,7 +114,7 @@ test('主流程：cleanOrphanStagingFiles 只清理 dsh-appshot-*.png', { skip: 
 })
 
 test('常规边界：目录不存在时不抛错', { skip: skipStaging }, async () => {
-  const { cleanOrphanStagingFiles } = await import('../src/staging.ts')
+  const { cleanOrphanStagingFiles } = await import('../src/macos/staging.ts')
   const dir = await makeTempDir()
   try {
     assert.equal(await cleanOrphanStagingFiles(join(dir, 'nope')), 0)
@@ -124,7 +124,7 @@ test('常规边界：目录不存在时不抛错', { skip: skipStaging }, async 
 })
 
 test('常规边界：命名规则严格匹配（.png.bak / 前缀不符不清理）', { skip: skipStaging }, async () => {
-  const { cleanOrphanStagingFiles } = await import('../src/staging.ts')
+  const { cleanOrphanStagingFiles } = await import('../src/macos/staging.ts')
   const dir = await makeTempDir()
   try {
     await writeFileBytes(dir, 'dsh-appshot-x.png', DUMMY_PNG)

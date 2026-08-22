@@ -1,4 +1,4 @@
-import type { AppshotEvent } from './types.ts'
+import type { AppshotEvent } from '../shared/types.ts'
 
 export interface NdjsonParserOptions {
   onEvent: (event: AppshotEvent) => void

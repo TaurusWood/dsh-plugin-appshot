@@ -24,7 +24,7 @@ import { existsSync } from 'node:fs'
 import { createMockCtx, createMockSocket, makeRef } from './helpers/mock-ctx.ts'
 import type { AppshotReadyFrame } from './helpers/types.ts'
 
-const sseReady = existsSync(new URL('../src/sse.ts', import.meta.url))
+const sseReady = existsSync(new URL('../src/macos/sse.ts', import.meta.url))
 const skipReason = sseReady
   ? false
   : 'T4.3 未实现：缺少 src/sse.ts（落地后自动激活；模块名不同请同步本文件）'
@@ -38,14 +38,14 @@ function makeFrame(): AppshotReadyFrame {
 }
 
 test('注册 /plugins/appshot/events 路由（主流程）', { skip: skipReason }, async () => {
-  const { createAppshotSSEHub } = await import('../src/sse.ts')
+  const { createAppshotSSEHub } = await import('../src/macos/sse.ts')
   const ctx = createMockCtx()
   createAppshotSSEHub(ctx)
   assert.ok(ctx.webServer.routes.has('/plugins/appshot/events'), '必须注册 appshot SSE 路由')
 })
 
 test('广播按 SSE 帧格式写入（主流程）', { skip: skipReason }, async () => {
-  const { createAppshotSSEHub } = await import('../src/sse.ts')
+  const { createAppshotSSEHub } = await import('../src/macos/sse.ts')
   const ctx = createMockCtx()
   const hub = createAppshotSSEHub(ctx)
   const handler = ctx.webServer.routes.get('/plugins/appshot/events')!
@@ -58,13 +58,13 @@ test('广播按 SSE 帧格式写入（主流程）', { skip: skipReason }, async
 })
 
 test('常规边界：无连接时广播不抛错', { skip: skipReason }, async () => {
-  const { createAppshotSSEHub } = await import('../src/sse.ts')
+  const { createAppshotSSEHub } = await import('../src/macos/sse.ts')
   const hub = createAppshotSSEHub(createMockCtx())
   assert.doesNotThrow(() => hub.broadcast(makeFrame()))
 })
 
 test('常规边界：断开的连接不再接收广播', { skip: skipReason }, async () => {
-  const { createAppshotSSEHub } = await import('../src/sse.ts')
+  const { createAppshotSSEHub } = await import('../src/macos/sse.ts')
   const ctx = createMockCtx()
   const hub = createAppshotSSEHub(ctx)
   const handler = ctx.webServer.routes.get('/plugins/appshot/events')!
@@ -79,7 +79,7 @@ test('常规边界：断开的连接不再接收广播', { skip: skipReason }, a
 })
 
 test('常规边界：dispose 结束所有连接', { skip: skipReason }, async () => {
-  const { createAppshotSSEHub } = await import('../src/sse.ts')
+  const { createAppshotSSEHub } = await import('../src/macos/sse.ts')
   const ctx = createMockCtx()
   const hub = createAppshotSSEHub(ctx)
   const handler = ctx.webServer.routes.get('/plugins/appshot/events')!

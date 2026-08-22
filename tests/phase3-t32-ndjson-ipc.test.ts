@@ -17,7 +17,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { existsSync } from 'node:fs'
 
-const ipcReady = existsSync(new URL('../src/ipc.ts', import.meta.url))
+const ipcReady = existsSync(new URL('../src/macos/ipc.ts', import.meta.url))
 const skipReason = ipcReady
   ? false
   : 'T3.2 Node 端未实现：缺少 src/ipc.ts（落地后自动激活；模块名不同请同步本文件）'
@@ -32,7 +32,7 @@ function makeHarness(): ParserHarness {
 }
 
 async function makeParser(harness: ParserHarness) {
-  const { createNdjsonParser } = await import('../src/ipc.ts')
+  const { createNdjsonParser } = await import('../src/macos/ipc.ts')
   return createNdjsonParser({
     onEvent: (event: unknown) => harness.events.push(event),
     onError: (error: unknown) => harness.errors.push(error),

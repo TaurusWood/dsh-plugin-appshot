@@ -20,7 +20,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { existsSync } from 'node:fs'
 
-const agentReady = existsSync(new URL('../src/agent.ts', import.meta.url))
+const agentReady = existsSync(new URL('../src/macos/agent.ts', import.meta.url))
 const skipReason = agentReady
   ? false
   : 'T4.1 未实现：缺少 src/agent.ts（落地后自动激活；模块名不同请同步本文件）'
@@ -33,7 +33,7 @@ const ERROR_FAKE = 'console.log(JSON.stringify({type:"error",code:"NATIVE_AGENT_
 const NEVER_READY = 'setInterval(()=>{},1e3)'
 
 test('启动 + ready 握手成功（主流程）', { skip: skipReason }, async () => {
-  const { startAgent } = await import('../src/agent.ts')
+  const { startAgent } = await import('../src/macos/agent.ts')
   const events: unknown[] = []
   const agent = await startAgent({
     command: process.execPath,
@@ -52,7 +52,7 @@ test('启动 + ready 握手成功（主流程）', { skip: skipReason }, async (
 })
 
 test('ready 握手超时：拒绝启动（常规边界）', { skip: skipReason }, async () => {
-  const { startAgent } = await import('../src/agent.ts')
+  const { startAgent } = await import('../src/macos/agent.ts')
   await assert.rejects(
     startAgent({
       command: process.execPath,
@@ -65,7 +65,7 @@ test('ready 握手超时：拒绝启动（常规边界）', { skip: skipReason }
 })
 
 test('子进程异常退出：onExit 上报退出码（常规边界）', { skip: skipReason }, async () => {
-  const { startAgent } = await import('../src/agent.ts')
+  const { startAgent } = await import('../src/macos/agent.ts')
   const events: unknown[] = []
   const exits: Array<{ code: number | null; signal: NodeJS.Signals | null }> = []
   const agent = await startAgent({
@@ -81,12 +81,12 @@ test('子进程异常退出：onExit 上报退出码（常规边界）', { skip:
 })
 
 test('命令不存在：启动失败并拒绝（常规边界）', { skip: skipReason }, async () => {
-  const { startAgent } = await import('../src/agent.ts')
+  const { startAgent } = await import('../src/macos/agent.ts')
   await assert.rejects(startAgent({ command: '/nonexistent/appshot-agent' }))
 })
 
 test('缺少执行权限：自动修复权限并成功启动（自愈边界）', { skip: skipReason }, async () => {
-  const { startAgent } = await import('../src/agent.ts')
+  const { startAgent } = await import('../src/macos/agent.ts')
   const { writeFileSync, chmodSync, unlinkSync, statSync } = await import('node:fs')
   const { join } = await import('node:path')
   const { tmpdir } = await import('node:os')
