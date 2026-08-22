@@ -332,6 +332,9 @@ internal static class Program
                 fallbackReason = result.FallbackReason,
                 timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
             });
+
+            // 落盘后用户反馈：快门音（防自截合同：仅在 PNG 已原子落盘后播放）
+            if (_soundEnabled) UI.ShutterSound.Play();
         }
         finally
         {
