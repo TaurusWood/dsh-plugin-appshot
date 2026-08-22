@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -63,8 +62,9 @@ public sealed class DualCtrlHook : IDisposable
             if (!injected || _allowInjected)
             {
                 int vk = Marshal.ReadInt32(lParam);
-                long nowTicks = Stopwatch.GetTimestamp();
-                long nowMs = nowTicks * 1000 / Stopwatch.Frequency;
+                // 触发载荷用 epoch 毫秒（IPC 合同 technical-windows.md §5.2）：
+                // Node 超时守卫用 Date.now() 比较 startedAt，混入 Stopwatch 单调时钟会被立即判超时。
+                long nowMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
                 bool keyDown = (int)wParam == WM_KEYDOWN || (int)wParam == WM_SYSKEYDOWN;
                 bool keyUp = (int)wParam == WM_KEYUP || (int)wParam == WM_SYSKEYUP;
 

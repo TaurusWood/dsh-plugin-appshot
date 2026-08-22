@@ -70,9 +70,10 @@ public static class TargetWindowFinder
         // 4. 类名与进程
         var className = GetClassName(top);
         var pid = GetWindowProcessId(top);
+        var processName = GetProcessName(pid);
 
-        // 5. 排除 DSH 自身
-        if (dshPid > 0 && pid == dshPid)
+        // 5. 排除 DSH 自身（PID 或 进程名）
+        if (TargetFilter.IsDshProcess(pid, processName, dshPid))
             return new TargetWindowResolveResult(null, TargetError.DshWindow);
 
         // 6. 排除桌面与任务栏
@@ -85,15 +86,25 @@ public static class TargetWindowFinder
         if (IsCloaked(top))
             return new TargetWindowResolveResult(null, TargetError.Cloaked);
 
-        // 8. DWM 有效外框（排除阴影的真实可视物理边界）
+        // 8. DWM 有效外框（排除阴影的真实可视物理边界，DWM 失败时用 GetWindowRect 兜底）
         var bounds = GetExtendedFrameBounds(top);
+        if (bounds.IsEmpty)
+        {
+            var wr = default(Rect);
+            if (NativeMethods.GetWindowRect(top, ref wr)) bounds = wr;
+        }
         if (bounds.IsEmpty)
             return new TargetWindowResolveResult(null, TargetError.NoTargetWindow);
 
-        // 9. 单显示器校验：鼠标所在显示器的 rcMonitor 必须完整包含外框
+        // 9. 单显示器校验：鼠标所在显示器的 rcMonitor 必须包含外框（允许最大化负边框容差）
         var monitorRect = GetMonitorRectFromPoint(cursorX, cursorY);
-        if (!monitorRect.Contains(bounds))
+        if (!SingleMonitorCheck.IsWithinMonitor(bounds, monitorRect))
             return new TargetWindowResolveResult(null, TargetError.AcrossMonitors);
+
+        // 10. 裁剪至物理屏幕范围（去除最大化窗口在屏幕外的负边框）
+        bounds = SingleMonitorCheck.ClampToMonitor(bounds, monitorRect);
+        if (bounds.IsEmpty || bounds.Width <= 0 || bounds.Height <= 0)
+            return new TargetWindowResolveResult(null, TargetError.NoTargetWindow);
 
         var title = GetWindowTitle(top);
         return new TargetWindowResolveResult(
@@ -104,9 +115,14 @@ public static class TargetWindowFinder
     public static bool IsStillSingleMonitor(IntPtr hwnd, int cursorX, int cursorY)
     {
         var bounds = GetExtendedFrameBounds(hwnd);
+        if (bounds.IsEmpty)
+        {
+            var wr = default(Rect);
+            if (NativeMethods.GetWindowRect(hwnd, ref wr)) bounds = wr;
+        }
         if (bounds.IsEmpty) return false;
         var monitorRect = GetMonitorRectFromPoint(cursorX, cursorY);
-        return monitorRect.Contains(bounds);
+        return SingleMonitorCheck.IsWithinMonitor(bounds, monitorRect);
     }
 
     public static Rect GetExtendedFrameBounds(IntPtr hwnd)
@@ -115,6 +131,19 @@ public static class TargetWindowFinder
         int hr = NativeMethods.DwmGetWindowAttribute(
             hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, ref rect, Marshal.SizeOf<Rect>());
         return hr == 0 ? rect : default;
+    }
+
+    private static string GetProcessName(int pid)
+    {
+        try
+        {
+            using var p = System.Diagnostics.Process.GetProcessById(pid);
+            return p.ProcessName;
+        }
+        catch
+        {
+            return "";
+        }
     }
 
     private static bool IsCloaked(IntPtr hwnd)

@@ -20,7 +20,8 @@ internal static class Program
     private static readonly Channel<string> _outbox = new();
     private static readonly Channel<string> _inbox = new();
     private static DualCtrlHook? _hook;
-    private static CancellationTokenSource _cts = new();
+    private static readonly CancellationTokenSource _appCts = new();
+    private static CancellationTokenSource? _activeCaptureCts;
     private static int _dshPid;
     private static string _stagingDir = "";
     private static string _instanceId = "";
@@ -32,27 +33,51 @@ internal static class Program
     private static int Main(string[] args)
     {
         _mainThreadId = NativeMethods.GetCurrentThreadId();
+
+        // 1. 全局未捕获异常兜底（防止子线程异常导致 CLR 无声闪退）
+        AppDomain.CurrentDomain.UnhandledException += (sender, e) =>
+        {
+            var exStr = e.ExceptionObject?.ToString() ?? "Unknown unhandled exception";
+            LogFatal("UNHANDLED_EXCEPTION", exStr);
+        };
+        TaskScheduler.UnobservedTaskException += (sender, e) =>
+        {
+            var exStr = e.Exception?.ToString() ?? "Unknown unobserved task exception";
+            LogFatal("UNOBSERVED_TASK_EXCEPTION", exStr);
+            e.SetObserved();
+        };
+
         try
         {
-            // 1. Per-Monitor V2 DPI 感知（manifest 声明 + 运行时兜底）
-            NativeMethods.SetProcessDpiAwarenessContext(
-                new IntPtr(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2));
+            WriteDiagLog($"main-entry args=[{string.Join(" ", args)}]");
 
-            // 2. 解析启动参数
+            // 2. Per-Monitor V2 DPI 感知（manifest 声明 + 运行时兜底）
+            try
+            {
+                NativeMethods.SetProcessDpiAwarenessContext(
+                    new IntPtr(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2));
+            }
+            catch (Exception dpiEx)
+            {
+                WriteDiagLog($"SetProcessDpiAwarenessContext non-fatal: {dpiEx.Message}");
+            }
+
+            // 3. 解析启动参数
             ParseArgs(args);
+            WriteDiagLog($"after-parse stagingDir='{_stagingDir}' dshPid={_dshPid}");
 
-            // 3. 注册通知窗口类
+            // 4. 注册通知窗口类
             NoActivateToast.RegisterClass();
 
-            // 4. 启动输出线程（stdout NDJSON）
+            // 5. 启动输出线程（stdout NDJSON）
             var outThread = new Thread(OutputLoop) { IsBackground = true };
             outThread.Start();
 
-            // 5. 启动输入线程（stdin NDJSON 指令：status/cancel/shutdown）
+            // 6. 启动输入线程（stdin NDJSON 指令：status/cancel/shutdown）
             var inThread = new Thread(InputLoop) { IsBackground = true };
             inThread.Start();
 
-            // 6. 安装左右 Ctrl 钩子
+            // 7. 安装左右 Ctrl 钩子
             _hook = new DualCtrlHook(allowInjected: _allowInjected);
             _hook.Triggered += OnTriggered;
             if (_diagTarget)
@@ -61,14 +86,15 @@ internal static class Program
                     SendFrame(new { type = "diag/key", vk, injected });
             }
 
-            // 7. ready 握手
+            // 8. ready 握手
             SendFrame(new { type = "ready", version = 1, platform = "win32", pid = Environment.ProcessId });
+            WriteDiagLog("ready-sent");
 
-            // 8. 工作线程：消费触发队列，执行目标锁定 → capture/request → 截图 → appshot 帧
+            // 9. 工作线程：消费触发队列，执行目标锁定 → capture/request → 截图 → appshot 帧
             var worker = new Thread(WorkerLoop) { IsBackground = true };
             worker.Start();
 
-            // 9. 标准消息泵（钩子回调依赖消息循环）：GetMessage 阻塞取消息
+            // 10. 标准消息泵（钩子回调依赖消息循环）：GetMessage 阻塞取消息
             //    （WH_KEYBOARD_LL 消息投递到安装线程队列，必须用 GetMessage 泵出）
             long lastBeat = 0;
             while (!_shutdown)
@@ -90,16 +116,68 @@ internal static class Program
         }
         catch (Exception ex)
         {
-            SendFrame(new { type = "fatal", code = "AGENT_INIT_FAILED", message = ex.Message });
-            Console.Error.WriteLine("appshot-win-x64 fatal: " + ex);
+            LogFatal("AGENT_INIT_FAILED", ex.ToString());
             return 1;
         }
         finally
         {
             _hook?.Dispose();
-            _cts.Cancel();
+            _appCts.Cancel();
+            WriteDiagLog("main-exit");
         }
         return 0;
+    }
+
+    private static void WriteDiagLog(string msg)
+    {
+        try
+        {
+            var line = $"[{DateTime.UtcNow:O}][pid:{Environment.ProcessId}] {msg}\n";
+            var globalLog = Path.Combine(Path.GetTempPath(), "dsh-appshot-native.log");
+            File.AppendAllText(globalLog, line);
+            if (!string.IsNullOrEmpty(_stagingDir))
+            {
+                Directory.CreateDirectory(_stagingDir);
+                File.AppendAllText(Path.Combine(_stagingDir, "started.txt"), line);
+            }
+        }
+        catch { }
+    }
+
+    private static void LogFatal(string code, string message)
+    {
+        try
+        {
+            var line = $"[{DateTime.UtcNow:O}][pid:{Environment.ProcessId}] FATAL [{code}]: {message}\n";
+            var globalLog = Path.Combine(Path.GetTempPath(), "dsh-appshot-native.log");
+            File.AppendAllText(globalLog, line);
+            var crashLog = Path.Combine(Path.GetTempPath(), "dsh-appshot-native-crash.log");
+            File.AppendAllText(crashLog, line);
+            if (!string.IsNullOrEmpty(_stagingDir))
+            {
+                Directory.CreateDirectory(_stagingDir);
+                File.WriteAllText(Path.Combine(_stagingDir, "crash.txt"), line);
+            }
+        }
+        catch { }
+
+        // 同步直接写输出，不依赖可能已终止的后台线程
+        try
+        {
+            var frame = JsonSerializer.Serialize(new { type = "fatal", code, message });
+            var bytes = Encoding.UTF8.GetBytes(frame + "\n");
+            using var stdout = Console.OpenStandardOutput();
+            stdout.Write(bytes, 0, bytes.Length);
+            stdout.Flush();
+        }
+        catch { }
+
+        try
+        {
+            Console.Error.WriteLine($"appshot-win-x64 fatal: {code}: {message}");
+            Console.Error.Flush();
+        }
+        catch { }
     }
 
     private static void ParseArgs(string[] args)
@@ -142,17 +220,28 @@ internal static class Program
 
     private static void WorkerLoop()
     {
-        foreach (var item in _inbox.ReadAll(_cts.Token))
+        try
         {
-            try
+            foreach (var item in _inbox.ReadAll(_appCts.Token))
             {
-                var trigger = JsonSerializer.Deserialize<CaptureTriggerJson>(item)!;
-                HandleTrigger(trigger);
+                try
+                {
+                    var trigger = JsonSerializer.Deserialize<CaptureTriggerJson>(item)!;
+                    HandleTrigger(trigger);
+                }
+                catch (Exception ex)
+                {
+                    WriteDiagLog($"worker handle error: {ex.Message}");
+                }
             }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine("worker error: " + ex);
-            }
+        }
+        catch (OperationCanceledException)
+        {
+            // 正常取消退出，不作为未捕获异常崩溃
+        }
+        catch (Exception ex)
+        {
+            LogFatal("WORKER_FATAL", ex.ToString());
         }
     }
 
@@ -185,6 +274,8 @@ internal static class Program
         }
 
         var captureId = Guid.NewGuid().ToString("D");
+        using var captureCts = CancellationTokenSource.CreateLinkedTokenSource(_appCts.Token);
+        _activeCaptureCts = captureCts;
         try
         {
             // 4. 发送 capture/request，等待接受（1000ms）
@@ -209,7 +300,7 @@ internal static class Program
 
             // 6. 两阶段截图（backup 已在阶段 1；置前成功后重截）
             var result = ScreenCapturer.CaptureAsync(
-                target.Hwnd, target.Bounds, _cts.Token,
+                target.Hwnd, target.Bounds, captureCts.Token,
                 attemptBringToFront: true,
                 bringToFrontHook: (_) => { }).GetAwaiter().GetResult();
 
@@ -242,6 +333,7 @@ internal static class Program
         }
         finally
         {
+            _activeCaptureCts = null;
             NativeMethods.DeleteObject(backupBmp);
         }
     }
@@ -276,15 +368,16 @@ internal static class Program
             var toast = new NoActivateToast(text);
             // 定位到主显示器工作区右下角
             var wa = GetWorkArea();
-            int w = Math.Min(420, wa.Right - wa.Left - 40);
+            int w = Math.Min(450, Math.Max(320, wa.Right - wa.Left - 40));
             int h = 48;
-            int x = wa.Right - w - 20;
-            int y = wa.Bottom - h - 20;
+            int x = wa.Right - w - 24;
+            int y = wa.Bottom - h - 24;
             toast.Show(x, y, w, h);
+            WriteDiagLog($"toast-shown text='{text}' bounds=[{x},{y},{w},{h}]");
         }
-        catch
+        catch (Exception ex)
         {
-            // 通知失败不影响主流程
+            WriteDiagLog($"ShowToast error: {ex.Message}");
         }
     }
 
@@ -331,55 +424,70 @@ internal static class Program
 
     private static void OutputLoop()
     {
-        using var stdout = Console.OpenStandardOutput();
-        foreach (var line in _outbox.ReadAll())
+        try
         {
-            var bytes = Encoding.UTF8.GetBytes(line + System.Environment.NewLine);
-            stdout.Write(bytes, 0, bytes.Length);
-            stdout.Flush();
+            using var stdout = Console.OpenStandardOutput();
+            foreach (var line in _outbox.ReadAll(_appCts.Token))
+            {
+                var bytes = Encoding.UTF8.GetBytes(line + System.Environment.NewLine);
+                stdout.Write(bytes, 0, bytes.Length);
+                stdout.Flush();
+            }
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            WriteDiagLog($"OutputLoop error: {ex.Message}");
         }
     }
 
     private static void InputLoop()
     {
-        using var stdin = Console.OpenStandardInput();
-        var buffer = new byte[4096];
-        var pending = new StringBuilder();
-        int read;
-        while (!_shutdown && (read = stdin.Read(buffer, 0, buffer.Length)) > 0)
+        try
         {
-            pending.Append(Encoding.UTF8.GetString(buffer, 0, read));
-            while (true)
+            using var stdin = Console.OpenStandardInput();
+            var buffer = new byte[4096];
+            var pending = new StringBuilder();
+            int read;
+            while (!_shutdown && (read = stdin.Read(buffer, 0, buffer.Length)) > 0)
             {
-                int nl = pending.ToString().IndexOf('\n');
-                if (nl < 0) break;
-                string line = pending.ToString(0, nl).Trim();
-                pending.Remove(0, nl + 1);
-                if (line.Length == 0) continue;
-                try
+                pending.Append(Encoding.UTF8.GetString(buffer, 0, read));
+                while (true)
                 {
-                    using var doc = JsonDocument.Parse(line);
-                    var root = doc.RootElement;
-                    string type = root.TryGetProperty("type", out var t) ? t.GetString() ?? "" : "";
-                    switch (type)
+                    int nl = pending.ToString().IndexOf('\n');
+                    if (nl < 0) break;
+                    string line = pending.ToString(0, nl).Trim();
+                    pending.Remove(0, nl + 1);
+                    if (line.Length == 0) continue;
+                    try
                     {
-                        case "status":
-                            HandleStatusFrame(root);
-                            break;
-                        case "cancel":
-                            HandleCancelFrame(root);
-                            break;
-                        case "shutdown":
-                            _shutdown = true;
-                            RequestExit();
-                            break;
+                        using var doc = JsonDocument.Parse(line);
+                        var root = doc.RootElement;
+                        string type = root.TryGetProperty("type", out var t) ? t.GetString() ?? "" : "";
+                        switch (type)
+                        {
+                            case "status":
+                                HandleStatusFrame(root);
+                                break;
+                            case "cancel":
+                                HandleCancelFrame(root);
+                                break;
+                            case "shutdown":
+                                _shutdown = true;
+                                RequestExit();
+                                break;
+                        }
+                    }
+                    catch
+                    {
+                        // 忽略坏帧
                     }
                 }
-                catch
-                {
-                    // 忽略坏帧
-                }
             }
+        }
+        catch (Exception ex)
+        {
+            WriteDiagLog($"InputLoop error: {ex.Message}");
         }
     }
 
@@ -401,7 +509,11 @@ internal static class Program
 
     private static void HandleCancelFrame(JsonElement root)
     {
-        _cts.Cancel();
+        try
+        {
+            _activeCaptureCts?.Cancel();
+        }
+        catch { }
     }
 }
 

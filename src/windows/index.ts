@@ -14,12 +14,14 @@
 import { randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { WindowsCaptureStateMachine } from './state-machine.ts'
 import { registerWindowsRoutes, type WindowsWebServerLike } from './http-routes.ts'
 import { startWindowsAgent, type WindowsAgentProcess } from './agent.ts'
 import { cleanOrphanWindowsStagingDirs, ingestWindowsScreenshot, writeInstanceLock } from './safe-ingest.ts'
 import type { WindowsNativeToNodeFrame } from './types.ts'
+import type { AppshotConfig } from '../types.ts'
 
 export interface WindowsHostContext {
   webServer?: WindowsWebServerLike
@@ -42,9 +44,16 @@ export interface WindowsPluginRuntime {
 }
 
 function resolveWindowsAgentBinaryPath(): string {
+  // 基于插件模块位置（import.meta.url）而非 cwd：
+  // DSH Desktop 运行时 cwd 是安装目录，不能用 cwd 定位插件内产物。
+  const currentDir = typeof __dirname !== 'undefined'
+    ? __dirname
+    : dirname(fileURLToPath(import.meta.url))
   const candidates = [
-    join(process.cwd(), 'bin', 'win-x64', 'appshot-win-x64.exe'),
-    join(process.cwd(), 'native', 'windows', 'bin', 'win-x64', 'appshot-win-x64.exe'),
+    // 打包后：dist/index.js → ../native/windows/bin/win-x64/
+    join(currentDir, '../native/windows/bin/win-x64/appshot-win-x64.exe'),
+    // 开发态：src/windows/index.ts → ../../native/windows/bin/win-x64/
+    join(currentDir, '../../native/windows/bin/win-x64/appshot-win-x64.exe'),
   ]
   for (const candidate of candidates) {
     try {
@@ -105,7 +114,8 @@ export async function applyWindows(ctx: WindowsHostContext, options: ApplyWindow
         return
       }
       case 'capture/request': {
-        const result = machine.onCaptureStarted(frame.captureId, frame.timestamp)
+        // startedAt 用宿主接收时间：超时守卫用 Date.now() 比较，混用 Native 时钟域会立即误判超时
+        const result = machine.onCaptureStarted(frame.captureId, Date.now())
         if (!result.accepted) {
           console.log('[dsh-plugin-appshot] capture rejected:', result.error, frame.captureId)
         }
@@ -168,9 +178,22 @@ export async function applyWindows(ctx: WindowsHostContext, options: ApplyWindow
     }
   }
 
+  // 维护 Windows 配置状态（默认 double-ctrl）
+  let currentConfig: AppshotConfig = {
+    platform: 'win32',
+    shortcutMode: 'double-ctrl',
+    soundEnabled: true,
+    animationEnabled: true,
+  }
+
   // 注册定向 HTTP 路由
   const disposeRoutes = registerWindowsRoutes(ctx as { webServer?: WindowsWebServerLike }, {
     machine,
+    getConfig: () => ({ ...currentConfig }),
+    onConfigUpdate: (next) => {
+      currentConfig = { ...next, platform: 'win32' }
+      console.log('[dsh-plugin-appshot] windows config updated:', currentConfig)
+    },
     onW0Report: (report) => {
       const line = JSON.stringify({ ts: Date.now(), report })
       console.log('[dsh-plugin-appshot] W0 report received:', line)
@@ -183,17 +206,41 @@ export async function applyWindows(ctx: WindowsHostContext, options: ApplyWindow
 
   // 启动 Native Agent（受环境变量与选项控制）
   const spawnAgent = options.spawnAgent !== false && process.env.DSH_DISABLE_AGENT_SPAWN !== '1'
+  const diagPath = join(stagingDir, 'diag.txt')
+  const appendDiag = (line: string) => {
+    const timestamp = new Date().toISOString()
+    void import('node:fs/promises').then((fs) =>
+      fs.appendFile(diagPath, `[${timestamp}] ${line}\n`, 'utf-8').catch(() => {}),
+    )
+  }
+
+  appendDiag(`init: spawnAgent=${spawnAgent} DSH_DISABLE_AGENT_SPAWN=${String(process.env.DSH_DISABLE_AGENT_SPAWN)}`)
   if (spawnAgent) {
     const binaryPath = resolveWindowsAgentBinaryPath()
-    if (binaryPath) {
+    const binaryExists = existsSync(binaryPath)
+    appendDiag(`binaryPath=${binaryPath} binaryExists=${binaryExists} cwd=${process.cwd()} ppid=${String(process.ppid || process.pid)}`)
+    if (binaryPath && binaryExists) {
       agent = startWindowsAgent({
         command: binaryPath,
         args: ['--mode', 'daemon', '--staging-dir', stagingDir, '--dsh-pid', String(process.ppid || process.pid)],
-        onFrame: (frame) => void onNativeFrame(frame),
+        readyTimeoutMs: 15000,
+        onFrame: (frame) => {
+          if (frame.type === 'ready') {
+            appendDiag(`agent ready received: pid=${frame.pid}`)
+          } else if (frame.type === 'fatal') {
+            appendDiag(`agent fatal: code=${frame.code} message=${frame.message}`)
+          }
+          void onNativeFrame(frame)
+        },
         onExit: (info) => {
-          console.log('[dsh-plugin-appshot] windows agent exited:', info.code, 'signal:', info.signal, 'willRestart:', info.willRestart)
+          const stderr = agent?.stderrLines().join(' | ') ?? ''
+          appendDiag(`agent exited: code=${String(info.code)} signal=${String(info.signal)} willRestart=${info.willRestart} stderr=${stderr}`)
+          console.log('[dsh-plugin-appshot] windows agent exited:', info.code, 'signal:', info.signal, 'willRestart:', info.willRestart, 'stderr:', stderr)
         },
       })
+      appendDiag(`agent started: pid=${String(agent.pid)}`)
+    } else {
+      appendDiag(`agent spawn skipped: binary not found at ${binaryPath}`)
     }
   }
 

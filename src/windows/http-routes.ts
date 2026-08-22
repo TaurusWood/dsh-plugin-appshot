@@ -49,10 +49,14 @@ export interface WindowsWebServerLike {
   }): () => void
 }
 
+import type { AppshotConfig } from '../types.ts'
+
 export interface WindowsRoutesOptions {
   machine: WindowsCaptureStateMachine
   /** W0 真机验证结果接收器（可选；未提供时不注册 w0-report 路由） */
   onW0Report?: (report: unknown) => void
+  getConfig?: () => AppshotConfig
+  onConfigUpdate?: (config: AppshotConfig) => void
 }
 
 export interface WindowsRoutesHandle {
@@ -309,6 +313,56 @@ export function registerWindowsRoutes(ctx: { webServer?: WindowsWebServerLike },
           }
           sendJson(res, result.httpCode, { error: result.action })
         })()
+      },
+    }),
+  )
+
+  // ── GET / POST /plugins/appshot/config ─────────────────────────────
+  disposers.push(
+    webServer.register({
+      kind: 'exact',
+      path: '/plugins/appshot/config',
+      handler: (req, res) => {
+        if (isCrossSite(req)) {
+          res.writeHead(403)
+          res.end()
+          return
+        }
+        if (req.method === 'GET') {
+          const current = options.getConfig?.() ?? {
+            platform: 'win32',
+            shortcutMode: 'double-ctrl',
+            soundEnabled: true,
+            animationEnabled: true,
+          }
+          sendJson(res, 200, current)
+          return
+        }
+        if (req.method === 'POST') {
+          void (async () => {
+            const body = await readJsonBody(req)
+            if (body === null) {
+              sendJson(res, 400, { error: 'INVALID_BODY' })
+              return
+            }
+            const current = options.getConfig?.() ?? {
+              platform: 'win32',
+              shortcutMode: 'double-ctrl',
+              soundEnabled: true,
+              animationEnabled: true,
+            }
+            const patch: Partial<AppshotConfig> = {}
+            if (typeof body.shortcutMode === 'string') patch.shortcutMode = body.shortcutMode as AppshotConfig['shortcutMode']
+            if (typeof body.soundEnabled === 'boolean') patch.soundEnabled = body.soundEnabled
+            if (typeof body.animationEnabled === 'boolean') patch.animationEnabled = body.animationEnabled
+            const merged: AppshotConfig = { ...current, ...patch, platform: 'win32' }
+            options.onConfigUpdate?.(merged)
+            sendJson(res, 200, merged)
+          })()
+          return
+        }
+        res.writeHead(405)
+        res.end()
       },
     }),
   )

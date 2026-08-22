@@ -58,6 +58,13 @@ public class TargetFilterTests
     }
 
     [Fact]
+    public void DshProcessNameIsExcluded()
+    {
+        Assert.Equal(FilterReason.DshWindow, TargetFilter.Evaluate(new WindowInfo(9999, "Chrome_WidgetWin_1", false, false, true, false, "DSH Desktop"), DshPid));
+        Assert.Equal(FilterReason.DshWindow, TargetFilter.Evaluate(new WindowInfo(9999, "Chrome_WidgetWin_1", false, false, true, false, "dsh.exe"), DshPid));
+    }
+
+    [Fact]
     public void InvisibleWindowIsExcluded()
     {
         Assert.Equal(FilterReason.NotVisible, TargetFilter.Evaluate(Win(visible: false), DshPid));
@@ -73,6 +80,20 @@ public class SingleMonitorCheckTests
     {
         var win = new Rect { Left = 100, Top = 100, Right = 1200, Bottom = 900 };
         Assert.True(SingleMonitorCheck.IsWithinMonitor(win, Monitor));
+    }
+
+    [Fact]
+    public void MaximizedWindowWithNegativeOffsetIsAllowedAndClamped()
+    {
+        // Windows 10/11 最大化窗口典型的 -8px 负外框
+        var maximizedWin = new Rect { Left = -8, Top = -8, Right = 1928, Bottom = 1088 };
+        Assert.True(SingleMonitorCheck.IsWithinMonitor(maximizedWin, Monitor));
+
+        var clamped = SingleMonitorCheck.ClampToMonitor(maximizedWin, Monitor);
+        Assert.Equal(0, clamped.Left);
+        Assert.Equal(0, clamped.Top);
+        Assert.Equal(1920, clamped.Right);
+        Assert.Equal(1080, clamped.Bottom);
     }
 
     [Fact]

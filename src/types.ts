@@ -37,7 +37,8 @@ export interface AppshotEventCapture {
 }
 
 export interface AppshotConfig {
-  shortcutMode?: 'double-cmd' | 'double-option' | 'double-control' | 'cmd-option'
+  platform?: 'win32' | 'darwin'
+  shortcutMode?: 'double-cmd' | 'double-option' | 'double-control' | 'cmd-option' | 'double-ctrl'
   soundEnabled?: boolean
   animationEnabled?: boolean
 }

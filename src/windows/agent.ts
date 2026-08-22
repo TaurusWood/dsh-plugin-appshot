@@ -33,6 +33,8 @@ export interface WindowsAgentProcess {
   /** 优雅退出：写 shutdown，等待 3s 超时强杀。 */
   stop(): Promise<void>
   wait(): Promise<number | null>
+  /** 诊断：子进程 stderr 最近 50 行。 */
+  stderrLines(): readonly string[]
 }
 
 const MAX_RESTARTS = 3
@@ -41,7 +43,8 @@ const STABLE_RESET_MS = 60_000
 const FORCE_KILL_TIMEOUT_MS = 3000
 
 export function startWindowsAgent(options: StartWindowsAgentOptions): WindowsAgentProcess {
-  const readyTimeoutMs = options.readyTimeoutMs ?? 5000
+  const readyTimeoutMs = options.readyTimeoutMs ?? 15000
+  const allowRestart = options.allowRestart ?? true
   const nowFn = options.now ?? Date.now
 
   let child: ChildProcess | null = null
@@ -53,16 +56,26 @@ export function startWindowsAgent(options: StartWindowsAgentOptions): WindowsAge
   let restartCount = 0
   let stableSince = nowFn()
   let stopTimer: ReturnType<typeof setTimeout> | null = null
+  let readyTimer: ReturnType<typeof setTimeout> | null = null
+  const stderrLines: string[] = []
   const exitWaiters: Array<(code: number | null) => void> = []
 
   const onFrameCb = (frame: WindowsNativeToNodeFrame) => {
+    if (frame.type === 'ready' && readyTimer) {
+      clearTimeout(readyTimer)
+      readyTimer = null
+    }
     options.onFrame?.(frame)
   }
 
   const spawnChild = () => {
     hasExited = false
     try {
-      child = spawn(options.command, options.args ?? [], { stdio: ['pipe', 'pipe', 'pipe'] })
+      child = spawn(options.command, options.args ?? [], {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        detached: true,
+        env: { ...process.env },
+      })
       currentPid = child.pid ?? 0
     } catch (err) {
       // spawn 同步失败：走 onExit 报告，不进入重启
@@ -81,9 +94,16 @@ export function startWindowsAgent(options: StartWindowsAgentOptions): WindowsAge
     child.stdout?.setEncoding('utf8')
     child.stdout?.on('data', (chunk: string) => parser.feed(chunk))
     child.stderr?.setEncoding('utf8')
+    // 消费 stderr：防止管道写满阻塞子进程；错误内容由 stderrLines 留存供诊断
+    child.stderr?.on('data', (chunk: unknown) => {
+      const text = typeof chunk === 'string' ? chunk : String(chunk ?? '')
+      const trimmed = text.trim()
+      if (trimmed && stderrLines.length < 50) stderrLines.push(trimmed)
+    })
 
-    const readyTimer = setTimeout(() => {
-      // 5s 内未收到 ready：视为启动失败，终止该子进程
+    if (readyTimer) clearTimeout(readyTimer)
+    readyTimer = setTimeout(() => {
+      // 15s 内未收到 ready：视为启动失败，终止该子进程
       if (child && !hasExited) {
         child.kill()
       }
@@ -94,13 +114,16 @@ export function startWindowsAgent(options: StartWindowsAgentOptions): WindowsAge
     })
 
     child.on('exit', (code, signal) => {
-      clearTimeout(readyTimer)
+      if (readyTimer) {
+        clearTimeout(readyTimer)
+        readyTimer = null
+      }
       hasExited = true
       exitCode = code !== null ? code : 0
       parser.end()
       for (const waiter of exitWaiters) waiter(exitCode)
 
-      if (stopped || !options.allowRestart) {
+      if (stopped || !allowRestart) {
         options.onExit?.({ code, signal, willRestart: false })
         return
       }
@@ -128,6 +151,7 @@ export function startWindowsAgent(options: StartWindowsAgentOptions): WindowsAge
 
   const handle: WindowsAgentProcess = {
     pid: currentPid,
+    stderrLines: () => [...stderrLines],
     send(frame: WindowsNodeToNativeFrame) {
       if (hasExited || !child?.stdin || !child.stdin.writable) return
       child.stdin.write(serializeWindowsCommand(frame))

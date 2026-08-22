@@ -103,8 +103,10 @@ export function createAppshotClient(deps: ClientDependencies): AppshotClient {
 const h = React.createElement
 
 export function AppshotSettingsSection() {
+  const isWinClient = typeof navigator !== 'undefined' && /Win/i.test(navigator.userAgent || '')
   const [config, setConfig] = useState<AppshotConfig>({
-    shortcutMode: 'double-cmd',
+    platform: isWinClient ? 'win32' : 'darwin',
+    shortcutMode: isWinClient ? 'double-ctrl' : 'double-cmd',
     soundEnabled: true,
     animationEnabled: true,
   })
@@ -119,8 +121,10 @@ export function AppshotSettingsSection() {
       .then((res) => res.json())
       .then((data: AppshotConfig) => {
         if (!unmounted && data && typeof data === 'object') {
+          const isWin = data.platform === 'win32' || isWinClient
           setConfig({
-            shortcutMode: data.shortcutMode ?? 'double-cmd',
+            platform: isWin ? 'win32' : 'darwin',
+            shortcutMode: data.shortcutMode ?? (isWin ? 'double-ctrl' : 'double-cmd'),
             soundEnabled: data.soundEnabled ?? true,
             animationEnabled: data.animationEnabled ?? true,
           })
@@ -158,6 +162,8 @@ export function AppshotSettingsSection() {
     }
   }
 
+  const isWin = config.platform === 'win32' || isWinClient
+
   return h('div', {
     style: {
       padding: '24px',
@@ -185,7 +191,9 @@ export function AppshotSettingsSection() {
         }, '✓ 已即时生效') : null,
       ),
       h('p', { style: { margin: 0, color: '#a1a1aa', fontSize: '13px' } },
-        '自动捕获 macOS 前台目标窗口并挂载到当前会话 Composer 输入框。',
+        isWin
+          ? '自动捕获 Windows 前台目标窗口并挂载到当前会话 Composer 输入框。'
+          : '自动捕获 macOS 前台目标窗口并挂载到当前会话 Composer 输入框。',
       ),
     ),
 
@@ -228,10 +236,17 @@ export function AppshotSettingsSection() {
             cursor: 'pointer',
           },
         },
-          h('option', { value: 'double-cmd' }, '双击 ⌘ Command（或左右 ⌘ 同时按）'),
-          h('option', { value: 'double-option' }, '双击 ⌥ Option（或左右 ⌥ 同时按）'),
-          h('option', { value: 'double-control' }, '双击 ⌃ Control'),
-          h('option', { value: 'cmd-option' }, '⌘ Command + ⌥ Option 组合键'),
+          ...(isWin
+            ? [
+                h('option', { key: 'ctrl', value: 'double-ctrl' }, '左右 Ctrl 同时按（默认）'),
+              ]
+            : [
+                h('option', { key: 'cmd', value: 'double-cmd' }, '双击 ⌘ Command（或左右 ⌘ 同时按）'),
+                h('option', { key: 'opt', value: 'double-option' }, '双击 ⌥ Option（或左右 ⌥ 同时按）'),
+                h('option', { key: 'ctrl', value: 'double-control' }, '双击 ⌃ Control'),
+                h('option', { key: 'combo', value: 'cmd-option' }, '⌘ Command + ⌥ Option 组合键'),
+              ]
+          ),
         ),
       ),
 
@@ -247,7 +262,11 @@ export function AppshotSettingsSection() {
       },
         h('div', null,
           h('div', { style: { fontWeight: 500, color: '#f4f4f5', marginBottom: '2px' } }, '快门提示音'),
-          h('div', { style: { fontSize: '12px', color: '#71717a' } }, '截图落盘后播放轻快的 macOS 原生快门音效反馈'),
+          h('div', { style: { fontSize: '12px', color: '#71717a' } },
+            isWin
+              ? '截图落盘后播放提示音效反馈'
+              : '截图落盘后播放轻快的 macOS 原生快门音效反馈',
+          ),
         ),
         h('label', { style: { position: 'relative', display: 'inline-block', width: '42px', height: '24px', cursor: 'pointer' } },
           h('input', {
