@@ -29,7 +29,7 @@ public static class CaptureFlyin
     private const uint WS_POPUP = 0x80000000;
 
     private const int FlyinDurationMs = 420;
-    private const int FrameIntervalMs = 33; // ~30fps
+    private const int FrameIntervalMs = 16; // ~60fps：帧距减半是消除整数像素跳感的第一要素
     private const int StartMaxWidth = 380;  // 缩略图初始最大宽（物理像素）
     private const int EndWidth = 36;        // 缩略图终末宽
 
@@ -117,10 +117,13 @@ public static class CaptureFlyin
         }
     }
 
-    /// <summary>逐帧上传：tick 精确调度 + DwmFlush 垂直同步，播放期零分配。</summary>
+    /// <summary>逐帧上传：高精度可等待定时器对齐帧距 + DwmFlush 等合成，播放期零分配。</summary>
     private static void Play(IntPtr hwnd, List<FlyFrame> frames)
     {
         NativeMethods.TimeBeginPeriod(1);
+        IntPtr timer = CreateHighResTimer();
+        IntPtr thread = NativeMethods.GetCurrentThread();
+        NativeMethods.SetThreadPriority(thread, 1 /* THREAD_PRIORITY_ABOVE_NORMAL */);
         IntPtr screenDc = IntPtr.Zero;
         IntPtr memDc = IntPtr.Zero;
         try
@@ -133,7 +136,7 @@ public static class CaptureFlyin
             {
                 long due = startTick + (long)(i + 1) * FrameIntervalMs;
                 long wait = due - Environment.TickCount64;
-                if (wait > 0) Thread.Sleep((int)wait);
+                if (wait > 0) WaitPrecise(timer, (int)wait);
 
                 var f = frames[i];
                 IntPtr old = NativeMethods.SelectObject(memDc, f.HBitmap);
@@ -146,7 +149,7 @@ public static class CaptureFlyin
                 NativeMethods.SelectObject(memDc, old);
                 if (i == 0)
                 {
-                    Program.WriteDiagLog($"flyin: first-frame ULW ok={ok} err={Marshal.GetLastWin32Error()} pos=({pos.X},{pos.Y}) size=({size.Width}x{size.Height})");
+                    Program.WriteDiagLog($"flyin: first-frame ULW ok={ok} err={Marshal.GetLastWin32Error()} pos=({pos.X},{pos.Y}) size=({size.Width}x{size.Height}) frames={frames.Count} hrTimer={timer != IntPtr.Zero}");
                 }
                 if (!ok) continue;
 
@@ -156,17 +159,46 @@ public static class CaptureFlyin
         }
         finally
         {
+            NativeMethods.SetThreadPriority(thread, 0 /* THREAD_PRIORITY_NORMAL */);
+            if (timer != IntPtr.Zero) NativeMethods.CloseHandle(timer);
             if (memDc != IntPtr.Zero) NativeMethods.DeleteDC(memDc);
             if (screenDc != IntPtr.Zero) NativeMethods.ReleaseDC(IntPtr.Zero, screenDc);
             NativeMethods.TimeEndPeriod(1);
         }
     }
 
-    /// <summary>ease-in 位移 + 线性缩小 + 尾段淡出，生成一帧的位图与几何。</summary>
+    /// <summary>高精度可等待定时器（Win10 1803+ 1ms 精度）；不支持时退化普通定时器。</summary>
+    private static IntPtr CreateHighResTimer()
+    {
+        IntPtr t = NativeMethods.CreateWaitableTimerExW(IntPtr.Zero, null, 0x2 /* CREATE_WAITABLE_TIMER_HIGH_RESOLUTION */, 0x1F0003 /* TIMER_ALL_ACCESS */);
+        if (t == IntPtr.Zero)
+        {
+            t = NativeMethods.CreateWaitableTimerExW(IntPtr.Zero, null, 0, 0x1F0003);
+        }
+        return t;
+    }
+
+    private static void WaitPrecise(IntPtr timer, int ms)
+    {
+        if (timer != IntPtr.Zero)
+        {
+            long due = -(long)ms * 10000; // 100ns 单位，负值 = 相对时间
+            if (NativeMethods.SetWaitableTimer(timer, ref due, 0, IntPtr.Zero, IntPtr.Zero, false))
+            {
+                NativeMethods.WaitForSingleObject(timer, uint.MaxValue);
+                return;
+            }
+        }
+        Thread.Sleep(ms);
+    }
+
+    /// <summary>easeInOutCubic 位移与缩放：两端速度收敛，消除最快段的大跳步。</summary>
     private static FlyFrame? BuildFrame(
         Image mid, PointF startCenter, PointF endCenter, int startW, int startH, double p)
     {
-        double ease = p * p; // ease-in：先慢后快，"吸入"感
+        double ease = p < 0.5
+            ? 4 * p * p * p
+            : 1 - Math.Pow(-2 * p + 2, 3) / 2;
         double cx = startCenter.X + (endCenter.X - startCenter.X) * ease;
         double cy = startCenter.Y + (endCenter.Y - startCenter.Y) * ease;
         int w = Math.Max(1, (int)(startW + (EndWidth - startW) * ease));
@@ -275,6 +307,27 @@ internal static partial class NativeMethods
 
     [DllImport("winmm.dll", EntryPoint = "timeEndPeriod")]
     internal static extern uint TimeEndPeriod(uint period);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    internal static extern IntPtr GetCurrentThread();
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool SetThreadPriority(IntPtr hThread, int nPriority);
+
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    internal static extern IntPtr CreateWaitableTimerExW(IntPtr lpTimerAttributes, string? lpTimerName, uint dwFlags, uint dwDesiredAccess);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool SetWaitableTimer(IntPtr hTimer, ref long lpDueTime, int lPeriod, IntPtr pfnCompletionRoutine, IntPtr lpArgToCompletionRoutine, bool fResume);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    internal static extern uint WaitForSingleObject(IntPtr hHandle, uint dwMilliseconds);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool CloseHandle(IntPtr hObject);
 
     [StructLayout(LayoutKind.Sequential)]
     internal struct BlendFunction
