@@ -55,21 +55,36 @@ public static class TaskbarLocator
             var root = AutomationElement.FromHandle(taskbar);
             if (root == null) return null;
 
-            foreach (var name in NameCandidates)
+            // 任务栏按钮的 UIA Name 带状态后缀（如 "DSH Desktop - 1 个运行窗口 已固定"），
+            // 精确匹配命不中，必须前缀匹配遍历
+            var all = root.FindAll(TreeScope.Descendants, Condition.TrueCondition);
+            foreach (AutomationElement el in all)
             {
-                var el = root.FindFirst(
-                    TreeScope.Descendants,
-                    new PropertyCondition(AutomationElement.NameProperty, name));
-                if (el == null) continue;
-                var r = el.Current.BoundingRectangle;
-                if (r.IsEmpty || r.Width <= 0 || r.Height <= 0) continue;
-                return new Rect
+                string name;
+                try
                 {
-                    Left = (int)r.Left,
-                    Top = (int)r.Top,
-                    Right = (int)r.Right,
-                    Bottom = (int)r.Bottom,
-                };
+                    name = el.Current.Name;
+                }
+                catch
+                {
+                    continue;
+                }
+                if (string.IsNullOrWhiteSpace(name)) continue;
+                foreach (var candidate in NameCandidates)
+                {
+                    if (name.StartsWith(candidate, StringComparison.OrdinalIgnoreCase))
+                    {
+                        var r = el.Current.BoundingRectangle;
+                        if (r.IsEmpty || r.Width <= 0 || r.Height <= 0) break;
+                        return new Rect
+                        {
+                            Left = (int)r.Left,
+                            Top = (int)r.Top,
+                            Right = (int)r.Right,
+                            Bottom = (int)r.Bottom,
+                        };
+                    }
+                }
             }
             return null;
         }
@@ -79,7 +94,7 @@ public static class TaskbarLocator
         }
     }
 
-    // Electron 任务栏按钮 Name 来自 AppUserModelID DisplayName / 进程名
+    // Electron 任务栏按钮 Name 前缀 = 应用显示名（后缀为运行状态）
     private static readonly string[] NameCandidates = ["DSH Desktop", "DeepSeek Harness"];
 }
 

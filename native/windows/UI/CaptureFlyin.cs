@@ -269,10 +269,11 @@ internal static partial class NativeMethods
     [DllImport("dwmapi.dll")]
     internal static extern int DwmFlush();
 
-    [DllImport("winmm.dll")]
+    // winmm 导出名是小写开头：必须显式指定 EntryPoint，否则按方法名查找抛 EntryPointNotFoundException
+    [DllImport("winmm.dll", EntryPoint = "timeBeginPeriod")]
     internal static extern uint TimeBeginPeriod(uint period);
 
-    [DllImport("winmm.dll")]
+    [DllImport("winmm.dll", EntryPoint = "timeEndPeriod")]
     internal static extern uint TimeEndPeriod(uint period);
 
     [StructLayout(LayoutKind.Sequential)]
