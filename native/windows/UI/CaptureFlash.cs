@@ -22,7 +22,7 @@ public static class CaptureFlash
     private const int WS_EX_LAYERED = 0x00080000;
     private const uint WS_POPUP = 0x80000000;
     private const int BorderPad = 6; // 物理像素；高 DPI 屏上过细不可见
-    private const int TotalDurationMs = 350;
+    private const int TotalDurationMs = 250;
     // 窗口过程必须原样转发 hwnd：DefWindowProc 依据 hwnd 查找类背景刷，
     // 丢失句柄会导致 WM_ERASEBKGND 不绘制、layered 窗口表面全透明（不可见）。
     private static readonly NativeMethods.WndProc WndProc = (hwnd, msg, wParam, lParam) =>
@@ -86,12 +86,11 @@ public static class CaptureFlash
         }
     }
 
-    /// <summary>两段脉冲曲线：0-45% 与 55-100% 各一次 255→0 衰减。</summary>
+    /// <summary>单次脉冲曲线：255 → 0 一次衰减（一下即收）。</summary>
     internal static byte ComputeAlpha(int tMs, int totalMs)
     {
-        double p = (double)tMs / totalMs;
-        double phase = p < 0.45 ? p / 0.45 : p < 0.55 ? 0 : (p - 0.55) / 0.45;
-        return (byte)Math.Max(0, 255 * (1 - phase));
+        double p = Math.Min(1.0, (double)tMs / totalMs);
+        return (byte)Math.Max(0, 255 * (1 - p));
     }
 
     private static void RegisterClassOnce()
