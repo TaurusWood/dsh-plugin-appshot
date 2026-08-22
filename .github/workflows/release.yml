@@ -45,7 +45,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: agent-macos
-          path: native/macos/.build/Appshot Agent.app
+          path: "native/macos/.build/Appshot Agent.app"
           if-no-files-found: error
 
   build-windows:
@@ -96,7 +96,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: agent-macos
-          path: native/macos/.build/Appshot Agent.app
+          path: "native/macos/.build/Appshot Agent.app"
 
       - name: Restore Windows agent artifact
         uses: actions/download-artifact@v4
@@ -104,7 +104,7 @@ jobs:
           name: agent-windows
           path: native/windows/bin/win-x64
 
-      - name: Pack and publish to npm (gate: both artifacts must exist)
+      - name: "Pack and publish to npm (gate: both artifacts must exist)"
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
