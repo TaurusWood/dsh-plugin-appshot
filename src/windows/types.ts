@@ -147,6 +147,8 @@ export type WindowsCaptureState =
       metadata: WindowsCaptureMetadata
       isFallback: boolean
       fallbackReason: string | null
+      /** 进入 PENDING_ACK 的时刻（nowFn 时钟域），供 pendingAck 超时守卫判定。 */
+      pendingSince: number
       rebindRequired?: boolean
     }
 

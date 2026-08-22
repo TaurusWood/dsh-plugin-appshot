@@ -155,3 +155,47 @@ test('W3.3 Agent 在 PENDING_ACK 期间退出，必须保留内存 Payload 允�
   assert.equal(mgr.onDeliveryResult('cap-1', 'client-inst-1', 'session-123', 'MOUNTED').httpCode, 200)
   assert.equal(mgr.getState().type, 'IDLE')
 })
+
+test('W3.4 PENDING_ACK 超时守卫：长期未 ACK 自愈为 cancelled，后续截图不再 BUSY', () => {
+  const nativeFrames: Array<{ type: string; captureId?: string; reason?: string }> = []
+  const machine = new WindowsCaptureStateMachine({
+    now: () => 1000,
+    onNativeFrame: (frame) => {
+      nativeFrames.push(frame as { type: string; captureId?: string; reason?: string })
+    },
+  })
+  machine.setLastActiveClient('client-inst-1', 'session-123')
+
+  // 模拟客户端已收到 ready 帧但 ACK 丢失（knownCaptureId 同 ID → 挂起等待状态变化）
+  const captureId = '11111111-1111-4111-8111-111111111111'
+  machine.onCaptureStarted(captureId, 1000)
+  machine.onAppshotReceived(captureId, new Uint8Array([1, 2]))
+  assert.equal(machine.getState().type, 'PENDING_ACK')
+
+  let waitOutcome: string | null = null
+  const outcomeOf = (): string | null => waitOutcome
+  machine.waitForChange(
+    'client-inst-1', captureId, null,
+    (result) => {
+      waitOutcome = result.outcome
+    },
+    () => {},
+  )
+
+  // 59.9s 未超时（默认 60000ms）
+  assert.equal(machine.onTimeoutTriggered(1000 + 59900).timedOut, false)
+  // 满 60s 超时：转 cancelled + IDLE + 下发 cancel:TIMEOUT + 唤醒 waiter
+  const res = machine.onTimeoutTriggered(1000 + 60000)
+  assert.equal(res.timedOut, true)
+  assert.equal(res.captureId, captureId)
+  assert.equal(machine.getState().type, 'IDLE')
+  assert.ok(nativeFrames.some((f) => f.type === 'cancel' && f.reason === 'TIMEOUT'))
+  assert.equal(outcomeOf(), 'cancelled')
+  // 已取消的 captureId 对客户端 poll 可见 cancelled（清理本地 pending 状态）
+  assert.equal(machine.poll('client-inst-1', captureId, null).outcome, 'cancelled')
+
+  // 自愈后新截图不再被 BUSY 拒绝
+  const accepted = machine.onCaptureStarted('22222222-2222-4222-8222-222222222222', 1000 + 61000)
+  assert.equal(accepted.accepted, true)
+})
+

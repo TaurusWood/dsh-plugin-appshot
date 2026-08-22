@@ -34,6 +34,8 @@ export interface CaptureStateMachineOptions {
   onNativeFrame?: (frame: WindowsNodeToNativeFrame) => void
   /** IN_FLIGHT 超时守卫，默认 15000ms。 */
   inflightTimeoutMs?: number
+  /** PENDING_ACK 超时守卫（交付卡死自愈），默认 60000ms。 */
+  pendingAckTimeoutMs?: number
   /** 长轮询无变化等待上限，默认 20000ms。 */
   pollTimeoutMs?: number
   /** cancelledCaptureIds TTL，默认 60000ms。 */
@@ -79,6 +81,7 @@ export class WindowsCaptureStateMachine {
   private readonly nowFn: () => number
   private readonly onNativeFrame?: (frame: WindowsNodeToNativeFrame) => void
   private readonly inflightTimeoutMs: number
+  private readonly pendingAckTimeoutMs: number
   private readonly pollTimeoutMs: number
   private readonly cancelledTtlMs: number
   private readonly completedLimit: number
@@ -87,6 +90,7 @@ export class WindowsCaptureStateMachine {
     this.nowFn = options.now ?? Date.now
     this.onNativeFrame = options.onNativeFrame
     this.inflightTimeoutMs = options.inflightTimeoutMs ?? 15000
+    this.pendingAckTimeoutMs = options.pendingAckTimeoutMs ?? 60000
     this.pollTimeoutMs = options.pollTimeoutMs ?? 20000
     this.cancelledTtlMs = options.cancelledTtlMs ?? 60000
     this.completedLimit = options.completedLimit ?? 50
@@ -173,6 +177,7 @@ export class WindowsCaptureStateMachine {
       metadata: fullMetadata,
       isFallback,
       fallbackReason,
+      pendingSince: this.nowFn(),
     }
     this.sendNative({ type: 'status', captureId, state: 'WAITING_DSH' })
     this.wakeWaiterFor(inflight.targetClientInstanceId)
@@ -191,15 +196,25 @@ export class WindowsCaptureStateMachine {
     }
   }
 
-  // ── 4. 15s 超时守卫 ────────────────────────────────────────────────────
-  /** 满 inflightTimeoutMs 时转移至 cancelled 并下发 cancel:TIMEOUT。 */
+  // ── 4. 超时守卫（IN_FLIGHT 15s / PENDING_ACK 60s）──────────────────────
+  /** IN_FLIGHT 满 inflightTimeoutMs 或 PENDING_ACK 满 pendingAckTimeoutMs 时转移至 cancelled 并下发 cancel:TIMEOUT。 */
   onTimeoutTriggered(now: number) {
     if (this.state.type === 'IN_FLIGHT' && now - this.state.startedAt >= this.inflightTimeoutMs) {
       const timedOutId = this.state.captureId
       this.recordCancelled(timedOutId)
       this.state = { type: 'IDLE' }
       this.sendNative({ type: 'cancel', captureId: timedOutId, reason: 'TIMEOUT' })
-      return { timedOut: true, captureId: timedOutId }
+      return { timedOut: true, captureId: timedOutId, phase: 'IN_FLIGHT' as const }
+    }
+    if (this.state.type === 'PENDING_ACK' && now - this.state.pendingSince >= this.pendingAckTimeoutMs) {
+      const pending = this.state
+      // 交付长期未确认（如 ACK 链路异常）：放弃该图自愈，避免 BUSY 永久拒绝后续截图
+      this.recordCancelled(pending.captureId)
+      this.state = { type: 'IDLE' }
+      this.sendNative({ type: 'cancel', captureId: pending.captureId, reason: 'TIMEOUT' })
+      const waiter = this.waiters.get(pending.targetClientInstanceId ?? '')
+      if (waiter) this.settleWaiter(waiter, { outcome: 'cancelled', captureId: pending.captureId })
+      return { timedOut: true, captureId: pending.captureId, phase: 'PENDING_ACK' as const }
     }
     return { timedOut: false }
   }
