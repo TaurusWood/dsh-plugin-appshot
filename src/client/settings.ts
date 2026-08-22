@@ -26,10 +26,13 @@ const MODIFIER_CODES: Record<string, WindowsModifierKey> = {
   ShiftRight: 'rshift',
 }
 
+// 颜色统一引用 DSH 主题令牌（@deepseek-ai/dsh-client-ui-theme design-platform.css，
+// body[data-ds-dark-theme] 随系统/用户外观切换取值）；fallback 为原暗色值，
+// 旧宿主未定义令牌时退化为纯暗色外观。
 const selectStyle: React.CSSProperties = {
-  background: '#27272a',
-  color: '#fafafa',
-  border: '1px solid rgba(255, 255, 255, 0.12)',
+  background: 'var(--dsw-alias-bg-layer-3, #27272a)',
+  color: 'var(--dsw-alias-label-primary, #fafafa)',
+  border: '1px solid var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.12))',
   borderRadius: '8px',
   padding: '6px 12px',
   fontSize: '13px',
@@ -151,8 +154,8 @@ export function AppshotSettingsSection() {
     style: {
       padding: '24px',
       maxWidth: '680px',
-      color: '#e4e4e7',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      color: 'var(--dsw-alias-label-primary, #e4e4e7)',
+      fontFamily: 'var(--dsw-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif)',
       fontSize: '14px',
       lineHeight: 1.5,
     },
@@ -160,31 +163,31 @@ export function AppshotSettingsSection() {
     // 头部区域
     h('div', { style: { marginBottom: '24px' } },
       h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' } },
-        h('h2', { style: { margin: 0, fontSize: '18px', fontWeight: 600, color: '#fafafa' } }, '截图捕获 (Appshot)'),
+        h('h2', { style: { margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--dsw-alias-label-primary, #fafafa)' } }, '截图捕获 (Appshot)'),
         savedBadge ? h('span', {
           style: {
             fontSize: '12px',
             padding: '2px 8px',
             borderRadius: '9999px',
-            background: 'rgba(34, 197, 94, 0.15)',
-            color: '#4ade80',
-            border: '1px solid rgba(34, 197, 94, 0.3)',
+            background: 'color-mix(in srgb, var(--dsw-alias-state-success-primary, rgb(34, 197, 94)) 15%, transparent)',
+            color: 'var(--dsw-alias-state-success-secondary, #4ade80)',
+            border: '1px solid color-mix(in srgb, var(--dsw-alias-state-success-primary, rgb(34, 197, 94)) 30%, transparent)',
             transition: 'all 0.2s',
           },
         }, '✓ 已即时生效') : null,
       ),
-      h('p', { style: { margin: 0, color: '#a1a1aa', fontSize: '13px' } },
+      h('p', { style: { margin: 0, color: 'var(--dsw-alias-label-secondary, #a1a1aa)', fontSize: '13px' } },
         isWin
-          ? '自动捕获 Windows 前台目标窗口并挂载到当前会话 Composer 输入框。'
-          : '自动捕获 macOS 前台目标窗口并挂载到当前会话 Composer 输入框。',
+          ? '按下快捷键，截取鼠标所在屏幕最前面的窗口，截图会自动出现在 DSH 的输入框里，随下一条消息一起发送。最前面是 DSH 自己的窗口时不会截图。'
+          : '按下快捷键，截取当前最前面的窗口，截图会自动出现在 DSH 的输入框里，随下一条消息一起发送。',
       ),
     ),
 
     // 主配置卡片
     h('div', {
       style: {
-        background: '#18181b',
-        border: '1px solid rgba(255, 255, 255, 0.08)',
+        background: 'var(--dsw-alias-bg-layer-2, #18181b)',
+        border: '1px solid var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.08))',
         borderRadius: '12px',
         overflow: 'hidden',
         boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
@@ -197,21 +200,25 @@ export function AppshotSettingsSection() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+          borderBottom: '1px solid var(--dsw-alias-border-l1, rgba(255, 255, 255, 0.06))',
         },
       },
         h('div', null,
-          h('div', { style: { fontWeight: 500, color: '#f4f4f5', marginBottom: '2px' } }, '触发快捷键'),
-          h('div', { style: { fontSize: '12px', color: '#71717a' } }, '在任意应用前台触发窗口截屏的全局按键组合'),
+          h('div', { style: { fontWeight: 500, color: 'var(--dsw-alias-label-primary, #f4f4f5)', marginBottom: '2px' } }, '触发快捷键'),
+          h('div', { style: { fontSize: '12px', color: 'var(--dsw-alias-label-secondary, #71717a)' } }, '在任何应用里按下即可截图的全局快捷键'),
           // 录键控件（仅 Windows 且选择自定义时展开）
           isWin && config.shortcutMode === 'custom'
             ? h('div', { style: { marginTop: '10px' } },
                 h('button', {
                   onClick: () => (recording ? cancelRecording() : (setPendingKey(null), setRecording(true))),
                   style: {
-                    background: recording ? '#3b82f6' : '#27272a',
-                    color: recording ? '#ffffff' : '#fafafa',
-                    border: '1px solid rgba(255, 255, 255, 0.12)',
+                    background: recording
+                      ? 'var(--dsw-alias-button-primary-fill, #3b82f6)'
+                      : 'var(--dsw-alias-bg-layer-3, #27272a)',
+                    color: recording
+                      ? 'var(--dsw-alias-label-primary-foreground, #ffffff)'
+                      : 'var(--dsw-alias-label-primary, #fafafa)',
+                    border: '1px solid var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.12))',
                     borderRadius: '8px',
                     padding: '6px 14px',
                     fontSize: '13px',
@@ -225,7 +232,7 @@ export function AppshotSettingsSection() {
                       : '请同时按住两个修饰键…（ESC 取消）'
                     : `${MODIFIER_LABELS[hotkeys.left]} + ${MODIFIER_LABELS[hotkeys.right]}　点击修改`,
                 ),
-                h('div', { style: { fontSize: '12px', color: '#71717a', marginTop: '6px' } },
+                h('div', { style: { fontSize: '12px', color: 'var(--dsw-alias-label-secondary, #71717a)', marginTop: '6px' } },
                   '支持 Ctrl / Alt / Shift 左右键任意组合；不含 Win 键。含 Shift 的组合可能与输入法切换冲突，请自行取舍。'),
               )
             : null,
@@ -259,15 +266,15 @@ export function AppshotSettingsSection() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+          borderBottom: '1px solid var(--dsw-alias-border-l1, rgba(255, 255, 255, 0.06))',
         },
       },
         h('div', null,
-          h('div', { style: { fontWeight: 500, color: '#f4f4f5', marginBottom: '2px' } }, '快门提示音'),
-          h('div', { style: { fontSize: '12px', color: '#71717a' } },
+          h('div', { style: { fontWeight: 500, color: 'var(--dsw-alias-label-primary, #f4f4f5)', marginBottom: '2px' } }, '快门提示音'),
+          h('div', { style: { fontSize: '12px', color: 'var(--dsw-alias-label-secondary, #71717a)' } },
             isWin
-              ? '截图落盘后播放提示音效反馈'
-              : '截图落盘后播放轻快的 macOS 原生快门音效反馈',
+              ? '截图成功后播放一声提示音'
+              : '截图成功后播放轻快的 macOS 原生快门音',
           ),
         ),
         h('label', { style: { position: 'relative', display: 'inline-block', width: '42px', height: '24px', cursor: 'pointer' } },
@@ -285,7 +292,7 @@ export function AppshotSettingsSection() {
               left: 0,
               right: 0,
               bottom: 0,
-              background: config.soundEnabled ? '#3b82f6' : '#3f3f46',
+              background: config.soundEnabled ? 'var(--dsw-alias-button-primary-fill, #3b82f6)' : 'var(--dsw-alias-button-tool-bar-fill, #3f3f46)',
               borderRadius: '24px',
               transition: 'all 0.2s',
             },
@@ -298,7 +305,7 @@ export function AppshotSettingsSection() {
                 width: '18px',
                 left: config.soundEnabled ? '21px' : '3px',
                 bottom: '3px',
-                background: '#ffffff',
+                background: 'var(--dsw-alias-label-primary-foreground, #ffffff)',
                 borderRadius: '50%',
                 transition: 'all 0.2s',
                 boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
@@ -318,8 +325,8 @@ export function AppshotSettingsSection() {
         },
       },
         h('div', null,
-          h('div', { style: { fontWeight: 500, color: '#f4f4f5', marginBottom: '2px' } }, '闪烁视觉反馈'),
-          h('div', { style: { fontSize: '12px', color: '#71717a' } }, '截图时在被捕获的目标窗口上方快速闪烁高亮动画'),
+          h('div', { style: { fontWeight: 500, color: 'var(--dsw-alias-label-primary, #f4f4f5)', marginBottom: '2px' } }, '截图动画反馈'),
+        h('div', { style: { fontSize: '12px', color: 'var(--dsw-alias-label-secondary, #71717a)' } }, '截图成功后被截窗口边框闪一下，缩略图飞向任务栏的 DSH 图标'),
         ),
         h('label', { style: { position: 'relative', display: 'inline-block', width: '42px', height: '24px', cursor: 'pointer' } },
           h('input', {
@@ -336,7 +343,7 @@ export function AppshotSettingsSection() {
               left: 0,
               right: 0,
               bottom: 0,
-              background: config.animationEnabled ? '#3b82f6' : '#3f3f46',
+              background: config.animationEnabled ? 'var(--dsw-alias-button-primary-fill, #3b82f6)' : 'var(--dsw-alias-button-tool-bar-fill, #3f3f46)',
               borderRadius: '24px',
               transition: 'all 0.2s',
             },
@@ -349,7 +356,7 @@ export function AppshotSettingsSection() {
                 width: '18px',
                 left: config.animationEnabled ? '21px' : '3px',
                 bottom: '3px',
-                background: '#ffffff',
+                background: 'var(--dsw-alias-label-primary-foreground, #ffffff)',
                 borderRadius: '50%',
                 transition: 'all 0.2s',
                 boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
