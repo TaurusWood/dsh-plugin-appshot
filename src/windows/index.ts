@@ -21,7 +21,7 @@ import { registerWindowsRoutes, type WindowsWebServerLike } from './http-routes.
 import { startWindowsAgent, type WindowsAgentProcess } from './agent.ts'
 import { cleanOrphanWindowsStagingDirs, ingestWindowsScreenshot, writeInstanceLock } from './safe-ingest.ts'
 import type { WindowsNativeToNodeFrame } from './types.ts'
-import type { AppshotConfig } from '../shared/types.ts'
+import type { AppshotConfig, WindowsHotkeys } from '../shared/types.ts'
 
 export interface WindowsHostContext {
   webServer?: WindowsWebServerLike
@@ -104,6 +104,8 @@ export async function applyWindows(ctx: WindowsHostContext, options: ApplyWindow
         })
       }
     }
+    // 恢复后同步当前配置（键位/音效/动画）
+    sendConfigToAgent()
   }
 
   const onNativeFrame = async (frame: WindowsNativeToNodeFrame) => {
@@ -178,12 +180,28 @@ export async function applyWindows(ctx: WindowsHostContext, options: ApplyWindow
     }
   }
 
-  // 维护 Windows 配置状态（默认 double-ctrl）
+  // 维护 Windows 配置状态（默认双 Ctrl）
   let currentConfig: AppshotConfig = {
     platform: 'win32',
     shortcutMode: 'double-ctrl',
+    windowsHotkeys: { left: 'lctrl', right: 'rctrl' },
     soundEnabled: true,
     animationEnabled: true,
+  }
+
+  // 配置热下发：键位/音效/动画即时同步 Native（config/update 帧）
+  const sendConfigToAgent = () => {
+    // 预设归一化：非 custom 模式一律双 Ctrl（避免从自定义切回预设时残留旧组合）
+    const hotkeys: WindowsHotkeys =
+      currentConfig.shortcutMode === 'custom' && currentConfig.windowsHotkeys
+        ? currentConfig.windowsHotkeys
+        : { left: 'lctrl', right: 'rctrl' }
+    agent?.send({
+      type: 'config/update',
+      hotkeys,
+      soundEnabled: currentConfig.soundEnabled ?? true,
+      animationEnabled: currentConfig.animationEnabled ?? true,
+    })
   }
 
   // 注册定向 HTTP 路由
@@ -193,6 +211,7 @@ export async function applyWindows(ctx: WindowsHostContext, options: ApplyWindow
     onConfigUpdate: (next) => {
       currentConfig = { ...next, platform: 'win32' }
       console.log('[dsh-plugin-appshot] windows config updated:', currentConfig)
+      sendConfigToAgent()
     },
     onW0Report: (report) => {
       const line = JSON.stringify({ ts: Date.now(), report })

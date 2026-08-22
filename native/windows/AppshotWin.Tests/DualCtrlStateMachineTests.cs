@@ -129,4 +129,53 @@ public class DualCtrlStateMachineTests
         clock.Advance(100);
         Assert.True(sm.OnKeyDown(DualCtrlStateMachine.VK_RCONTROL));
     }
+
+    [Fact]
+    public void CustomModifierKeysTriggerCombo()
+    {
+        var clock = new FakeClock();
+        var sm = new DualCtrlStateMachine(
+            combinationWindowMs: 300, cooldownMs: 500, clockMs: clock.Get(),
+            leftVk: DualCtrlStateMachine.VK_LALT, rightVk: DualCtrlStateMachine.VK_RALT);
+
+        // 默认双 Ctrl 的键不再生效
+        Assert.False(sm.OnKeyDown(DualCtrlStateMachine.VK_LCONTROL));
+        Assert.False(sm.OnKeyDown(DualCtrlStateMachine.VK_RCONTROL));
+        Assert.False(sm.IsLeftDown);
+        Assert.False(sm.IsRightDown);
+
+        // 自定义键组合窗内触发
+        clock.Advance(50);
+        Assert.False(sm.OnKeyDown(DualCtrlStateMachine.VK_LALT));
+        clock.Advance(80);
+        Assert.True(sm.OnKeyDown(DualCtrlStateMachine.VK_RALT));
+        Assert.True(sm.InFlight);
+
+        sm.OnKeyUp(DualCtrlStateMachine.VK_LALT);
+        sm.OnKeyUp(DualCtrlStateMachine.VK_RALT);
+        Assert.False(sm.InFlight);
+    }
+
+    [Fact]
+    public void UpdateKeysResetsStateAndSwitchesCombo()
+    {
+        var clock = new FakeClock();
+        var sm = Create(clock.Get());
+
+        // 双 Ctrl 按下一半后热更新为 lctrl+lalt：残留按下状态复位
+        sm.OnKeyDown(DualCtrlStateMachine.VK_LCONTROL);
+        sm.UpdateKeys(DualCtrlStateMachine.VK_LCONTROL, DualCtrlStateMachine.VK_LALT);
+        Assert.False(sm.IsLeftDown);
+        Assert.False(sm.InFlight);
+
+        // 旧右键（rctrl）不再参与组合
+        Assert.False(sm.OnKeyDown(DualCtrlStateMachine.VK_RCONTROL));
+        Assert.False(sm.IsRightDown);
+
+        // 新组合可正常触发
+        clock.Advance(100);
+        Assert.False(sm.OnKeyDown(DualCtrlStateMachine.VK_LCONTROL));
+        clock.Advance(100);
+        Assert.True(sm.OnKeyDown(DualCtrlStateMachine.VK_LALT));
+    }
 }

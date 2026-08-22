@@ -51,6 +51,10 @@ public sealed class DualCtrlHook : IDisposable
     public (bool LeftDown, bool RightDown, bool InFlight) GetState() =>
         _stateMachine.GetState();
 
+    /// <summary>键位热更新（config/update 帧驱动）；键位与组合判定统一由状态机维护。</summary>
+    public void UpdateKeys(int leftVk, int rightVk) =>
+        _stateMachine.UpdateKeys(leftVk, rightVk);
+
     private IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
     {
         if (nCode >= 0)

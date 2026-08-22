@@ -27,6 +27,8 @@ internal static class Program
     private static string _instanceId = "";
     private static bool _allowInjected;
     private static bool _diagTarget;
+    private static volatile bool _soundEnabled = true;
+    private static volatile bool _animationEnabled = true;
     private static uint _mainThreadId;
 
     [STAThread]
@@ -472,6 +474,9 @@ internal static class Program
                             case "cancel":
                                 HandleCancelFrame(root);
                                 break;
+                            case "config/update":
+                                HandleConfigFrame(root);
+                                break;
                             case "shutdown":
                                 _shutdown = true;
                                 RequestExit();
@@ -515,6 +520,53 @@ internal static class Program
         }
         catch { }
     }
+
+    private static void HandleConfigFrame(JsonElement root)
+    {
+        try
+        {
+            if (root.TryGetProperty("hotkeys", out var hk))
+            {
+                string left = hk.TryGetProperty("left", out var l) ? l.GetString() ?? "lctrl" : "lctrl";
+                string right = hk.TryGetProperty("right", out var r) ? r.GetString() ?? "rctrl" : "rctrl";
+                int lvk = ModifierToVk(left);
+                int rvk = ModifierToVk(right);
+                if (lvk != 0 && rvk != 0 && lvk != rvk)
+                {
+                    _hook?.UpdateKeys(lvk, rvk);
+                    WriteDiagLog($"config hotkeys updated: {left}+{right}");
+                }
+                else
+                {
+                    WriteDiagLog($"config hotkeys rejected: left={left} right={right}");
+                }
+            }
+            if (root.TryGetProperty("soundEnabled", out var s) &&
+                (s.ValueKind == JsonValueKind.True || s.ValueKind == JsonValueKind.False))
+            {
+                _soundEnabled = s.GetBoolean();
+            }
+            if (root.TryGetProperty("animationEnabled", out var a) &&
+                (a.ValueKind == JsonValueKind.True || a.ValueKind == JsonValueKind.False))
+            {
+                _animationEnabled = a.GetBoolean();
+            }
+        }
+        catch (Exception ex)
+        {
+            WriteDiagLog($"config frame error: {ex.Message}");
+        }
+    }
+
+    /// <summary>修饰键名 → 虚拟键码；池子限定 lctrl/rctrl/lalt/ralt（Shift/Win 系统副作用排除）。</summary>
+    private static int ModifierToVk(string name) => name switch
+    {
+        "lctrl" => Hotkey.DualCtrlStateMachine.VK_LCONTROL,
+        "rctrl" => Hotkey.DualCtrlStateMachine.VK_RCONTROL,
+        "lalt" => Hotkey.DualCtrlStateMachine.VK_LALT,
+        "ralt" => Hotkey.DualCtrlStateMachine.VK_RALT,
+        _ => 0,
+    };
 }
 
 /// <summary>工作线程通道（简化阻塞集合）。</summary>

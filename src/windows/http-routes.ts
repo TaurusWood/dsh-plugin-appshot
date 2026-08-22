@@ -49,7 +49,7 @@ export interface WindowsWebServerLike {
   }): () => void
 }
 
-import type { AppshotConfig } from '../shared/types.ts'
+import type { AppshotConfig, WindowsModifierKey } from '../shared/types.ts'
 
 export interface WindowsRoutesOptions {
   machine: WindowsCaptureStateMachine
@@ -125,6 +125,12 @@ const deliveryStatuses: readonly WindowsDeliveryResultStatus[] = ['MOUNTED', 'BU
 
 function isDeliveryResultStatus(value: string): value is WindowsDeliveryResultStatus {
   return (deliveryStatuses as readonly string[]).includes(value)
+}
+
+const modifierKeys: readonly string[] = ['lctrl', 'rctrl', 'lalt', 'ralt']
+
+function isModifierKey(value: string): value is WindowsModifierKey {
+  return modifierKeys.includes(value)
 }
 
 /** 注册全部 Windows 路由；返回注销函数。 */
@@ -355,6 +361,19 @@ export function registerWindowsRoutes(ctx: { webServer?: WindowsWebServerLike },
             if (typeof body.shortcutMode === 'string') patch.shortcutMode = body.shortcutMode as AppshotConfig['shortcutMode']
             if (typeof body.soundEnabled === 'boolean') patch.soundEnabled = body.soundEnabled
             if (typeof body.animationEnabled === 'boolean') patch.animationEnabled = body.animationEnabled
+            // 修饰键组合校验：枚举内 且 两键不同（Shift/Win 因系统副作用排除在池外）
+            if (body.windowsHotkeys !== null && typeof body.windowsHotkeys === 'object') {
+              const hk = body.windowsHotkeys as { left?: unknown; right?: unknown }
+              if (
+                typeof hk.left === 'string' && typeof hk.right === 'string' &&
+                isModifierKey(hk.left) && isModifierKey(hk.right) && hk.left !== hk.right
+              ) {
+                patch.windowsHotkeys = { left: hk.left, right: hk.right }
+              } else {
+                sendJson(res, 400, { error: 'INVALID_HOTKEYS' })
+                return
+              }
+            }
             const merged: AppshotConfig = { ...current, ...patch, platform: 'win32' }
             options.onConfigUpdate?.(merged)
             sendJson(res, 200, merged)

@@ -38,9 +38,19 @@ export interface AppshotEventCapture {
 
 export interface AppshotConfig {
   platform?: 'win32' | 'darwin'
-  shortcutMode?: 'double-cmd' | 'double-option' | 'double-control' | 'cmd-option' | 'double-ctrl'
+  shortcutMode?: 'double-cmd' | 'double-option' | 'double-control' | 'cmd-option' | 'double-ctrl' | 'custom'
+  /** Windows 修饰键组合（双 Ctrl 预设 = lctrl+rctrl）；池子排除 Shift/Win（系统副作用）。 */
+  windowsHotkeys?: WindowsHotkeys
   soundEnabled?: boolean
   animationEnabled?: boolean
+}
+
+/** Windows 触发键修饰键池（虚拟键 lctrl=0xA2 / rctrl=0xA3 / lalt=0xA4 / ralt=0xA5）。 */
+export type WindowsModifierKey = 'lctrl' | 'rctrl' | 'lalt' | 'ralt'
+
+export interface WindowsHotkeys {
+  left: WindowsModifierKey
+  right: WindowsModifierKey
 }
 
 export interface AppshotEventError {

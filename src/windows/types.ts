@@ -6,6 +6,8 @@
  * 测试接线后由本文件统一导出。
  */
 
+import type { WindowsModifierKey } from '../shared/types.ts'
+
 // ── 捕获元数据 ──────────────────────────────────────────────────────────
 export interface WindowsCaptureMetadata {
   appName: string
@@ -101,6 +103,14 @@ export interface WindowsShutdownFrame {
   type: 'shutdown'
 }
 
+/** Node → Native 配置热更新（键位/音效/动画开关）。 */
+export interface WindowsConfigUpdateFrame {
+  type: 'config/update'
+  hotkeys: { left: WindowsModifierKey; right: WindowsModifierKey }
+  soundEnabled: boolean
+  animationEnabled: boolean
+}
+
 export type WindowsNativeToNodeFrame =
   | WindowsReadyFrame
   | WindowsCaptureRequestFrame
@@ -114,6 +124,7 @@ export type WindowsNodeToNativeFrame =
   | WindowsStatusFrame
   | WindowsCancelFrame
   | WindowsShutdownFrame
+  | WindowsConfigUpdateFrame
 
 export type WindowsIpcFrame = WindowsNativeToNodeFrame | WindowsNodeToNativeFrame
 
