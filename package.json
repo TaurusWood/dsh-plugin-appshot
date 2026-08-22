@@ -1,7 +1,7 @@
 {
   "name": "dsh-plugin-appshot",
   "version": "0.2.0",
-  "description": "dsh-plugin-appshot — a DeepSeek Harness plugin for macOS context screenshot capture.",
+  "description": "dsh-plugin-appshot — a DeepSeek Harness plugin for macOS and Windows context screenshot capture.",
   "license": "MIT",
   "author": "TaurusWood",
   "repository": {
@@ -21,6 +21,8 @@
     "screenshot",
     "screencapturekit",
     "macos",
+    "windows",
+    "win32",
     "agent",
     "context"
   ],
@@ -41,7 +43,8 @@
     "cordis.patch.yml",
     "CHANGELOG.md",
     "CHANGELOG.zh-CN.md",
-    "native/macos/.build/Appshot Agent.app"
+    "native/macos/.build/Appshot Agent.app",
+    "native/windows/bin/win-x64"
   ],
   "dsh": {
     "bundle": {
@@ -57,9 +60,10 @@
     }
   },
   "scripts": {
-    "prepack": "pnpm build && pnpm build:native",
+    "prepack": "node scripts/prepack.mjs",
     "build": "npx esbuild src/index.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/index.js && npx esbuild src/client.ts --bundle --platform=browser --format=cjs --external:react --external:react-dom --external:react/jsx-runtime --banner:js=\"window.__ModuleLoader__.load({ id: 'dsh-plugin-appshot', factory: (require) => { var module = { exports: {} }; var exports = module.exports;\" --footer:js=\"return module.exports; } });\" --outfile=dist/client.js",
     "build:native": "./native/macos/scripts/build-app.sh",
+    "build:native:windows": "dotnet publish native/windows/AppshotWin.csproj -c Release -o native/windows/bin/win-x64",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node scripts/run-tests.ts",
     "test:windows": "node scripts/run-tests.ts --windows",

@@ -140,9 +140,10 @@
 ### 3.1 运行环境与分发选型
 - **开发语言与运行时**：C# (.NET 8.0)；
 - **目标框架 (TFM)**：`net8.0-windows10.0.19041.0`；
-- **分发形态**：**首期锁定 Self-Contained 单文件发布**（`win-x64`）：
+- **分发形态**：**首期锁定 Self-Contained 单文件发布**（`win-x64`），输出到包内契约路径
+  `native/windows/bin/win-x64/`（运行时 `src/windows/index.ts` 按该路径解析二进制）：
   ```bash
-  dotnet publish native/windows/AppshotWin.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o bin/win-x64
+  dotnet publish native/windows/AppshotWin.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o native/windows/bin/win-x64
   ```
 - **DPI 感知**：进程入口显式调用：
   ```csharp
@@ -549,7 +550,7 @@ appshot-win-x64.exe --mode daemon --staging-dir "C:\Users\User\AppData\Local\Tem
    ```
 3. **构建命令**：
    ```bash
-   dotnet publish native/windows/AppshotWin.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o bin/win-x64
+   dotnet publish native/windows/AppshotWin.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o native/windows/bin/win-x64
    ```
 4. **发布产物矩阵**：
    - `build-macos`：在 macOS runner 编译、签名并上传 macOS Agent artifact；

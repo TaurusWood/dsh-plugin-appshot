@@ -1,5 +1,10 @@
 name: Release
 
+# 双平台构建 + 装配发布（docs/technical-windows.md §7.4）：
+# - build-macos / build-windows 在各自平台构建 Native 产物并上传 artifact；
+# - assemble 下载两端 artifact 还原到运行时契约路径，prepack Gate 校验双端产物
+#   齐备后 npm publish，并创建附产物的 GitHub Release。
+
 on:
   push:
     tags:
@@ -9,7 +14,7 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  build-macos:
     runs-on: macos-latest
     steps:
       - name: Checkout repository
@@ -31,18 +36,88 @@ jobs:
       - name: Typecheck and test
         run: |
           pnpm typecheck
-          pnpm test
+          pnpm test:macos
 
-      - name: Build plugin and native agent
+      - name: Build macOS native agent
+        run: pnpm build:native
+
+      - name: Upload macOS agent artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-macos
+          path: native/macos/.build/Appshot Agent.app
+          if-no-files-found: error
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Native unit tests
+        run: dotnet test native/windows/AppshotWin.Tests/AppshotWin.Tests.csproj -c Release
+
+      - name: Build Windows native agent
+        run: dotnet publish native/windows/AppshotWin.csproj -c Release -o native/windows/bin/win-x64
+
+      - name: Upload Windows agent artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-windows
+          path: native/windows/bin/win-x64/appshot-win-x64.exe
+          if-no-files-found: error
+
+  assemble:
+    needs: [build-macos, build-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Restore macOS agent artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: agent-macos
+          path: native/macos/.build/Appshot Agent.app
+
+      - name: Restore Windows agent artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: agent-windows
+          path: native/windows/bin/win-x64
+
+      - name: Pack and publish to npm (gate: both artifacts must exist)
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          pnpm build
-          pnpm build:native
+          echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
+          npm publish --access public
 
-      - name: Package native agent app
+      - name: Package release assets
         run: |
           cd native/macos/.build
           zip -r ../../../appshot-agent-macos.zip "Appshot Agent.app"
           cd ../../..
+          cp native/windows/bin/win-x64/appshot-win-x64.exe appshot-win-x64.exe
+          zip appshot-agent-windows.zip appshot-win-x64.exe
 
       - name: Create GitHub Release
         env:
@@ -51,4 +126,4 @@ jobs:
           gh release create "${{ github.ref_name }}" \
             --title "${{ github.ref_name }}" \
             --generate-notes \
-            appshot-agent-macos.zip
+            appshot-agent-macos.zip appshot-agent-windows.zip
