@@ -130,6 +130,38 @@ Windows Basic 因此同时锁定 `targetClientInstanceId` 和 `targetSessionId`�
 - 不修改 DSH 自身 allowlist；
 - Windows Basic 使用自建 HTTP 路由。
 
+### 3.6 Client 主题令牌（`--dsw-alias-*` / `data-ds-dark-theme`）
+
+> 核查日期：2026-08-22；证据来源：Windows 本机 DSH Desktop 2.0.1 安装产物
+> `resources/app.asar.unpacked/node_modules/@deepseek-ai/dsh-client-ui-theme@0.1.0-rc.7/lib/`
+> （`styles/base.css`、`styles/design-platform.css`、`client.js`），属源码级证据。
+
+DSH Renderer 内存在官方主题体系，插件 UI 不得硬编码颜色：
+
+- `design-platform.css` 定义约 78 个语义令牌 `--dsw-alias-*`：背景分层
+  `bg-base` / `bg-layer-1/2/3`、边框 `border-l1..l4`、文字 `label-primary` /
+  `label-dimmed` / `label-caption`、主色 `brand-primary` / `button-primary-fill` /
+  `label-primary-foreground`、交互 `interactive-bg-hover` / `button-tool-bar-fill` 等；
+- 明暗切换机制：`body { … }` 为亮色默认值，`body[data-ds-dark-theme] { … }`
+  整体重定义全部令牌取值；`client.js` 持有 `matchMedia('(prefers-color-scheme: dark)')`
+  监听（跟随系统），同时提供用户可选外观（含 `appearance.dark`）；
+- 字体栈 `--dsw-font-family` 定义于 `base.css`；
+- DSH 自家组件（如 `AppearanceRow.module.css`）即以 `var(--dsw-alias-…)` 书写样式，
+  这是插件 UI 的同构参考。
+
+使用规则（appshot 设置面板已按此实现，`src/client/settings.ts`）：
+
+- 颜色一律写 `var(--dsw-alias-…, <暗色 fallback>)`：变量随 DSH 外观（系统/用户设置）
+  自动明暗翻转；旧宿主未定义令牌时退化为纯暗色，不产生回归；
+- 成功/错误/警告等状态色使用 `--dsw-alias-state-success-*` / `state-error-*` /
+  `state-warn-*` 系列；需要半透明底色时用
+  `color-mix(in srgb, var(--dsw-alias-…) N%, transparent)` 从令牌派生，不手写 rgba；
+- 主色填充上的前景（按钮文字、toggle 圆点）使用 `--dsw-alias-label-primary-foreground`
+  （亮色为白、暗色为深墨，与 `button-primary-fill` 轨道自动形成对比）；
+- 投影（box-shadow）在主题包中无对应令牌，保留中性黑透明即可；
+- 引用前缀必须精确为 `--dsw-alias-*` / `--dsw-static-*` / `--dsw-font-family`；
+  `--ds-*`（无 `w`）是另一组旧变量（仅 base.css 中字体/动效），不得混用。
+
 ## 4. Windows Basic 已冻结接口结论
 
 | 能力 | 结论 |
@@ -145,6 +177,7 @@ Windows Basic 因此同时锁定 `targetClientInstanceId` 和 `targetSessionId`�
 | 重放去重 | 校验目标 Session 的 `imageIds` 和 Draft registry 后再补 ACK |
 | Host Attachment | Windows Basic 不调用 `saveImage`，避免产生无法直接挂入 Draft 的孤儿 Attachment |
 | 成功边界 | Composer 已挂载且 Node 收到合法 `MOUNTED` |
+| 插件 UI 配色 | 引用 `--dsw-alias-*` 主题令牌（带暗色 fallback），不硬编码颜色 |
 
 ## 5. 实施 Gate
 
