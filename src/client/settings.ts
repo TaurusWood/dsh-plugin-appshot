@@ -3,15 +3,36 @@
  */
 
 import React, { useState, useEffect } from 'react'
-import type { AppshotConfig } from '../shared/types.ts'
+import type { AppshotConfig, WindowsHotkeys, WindowsModifierKey } from '../shared/types.ts'
 
 const h = React.createElement
+
+const MODIFIER_LABELS: Record<WindowsModifierKey, string> = {
+  lctrl: '左 Ctrl',
+  rctrl: '右 Ctrl',
+  lalt: '左 Alt',
+  ralt: '右 Alt',
+}
+
+const MODIFIER_KEYS = Object.keys(MODIFIER_LABELS) as WindowsModifierKey[]
+
+const selectStyle: React.CSSProperties = {
+  background: '#27272a',
+  color: '#fafafa',
+  border: '1px solid rgba(255, 255, 255, 0.12)',
+  borderRadius: '8px',
+  padding: '6px 12px',
+  fontSize: '13px',
+  outline: 'none',
+  cursor: 'pointer',
+}
 
 export function AppshotSettingsSection() {
   const isWinClient = typeof navigator !== 'undefined' && /Win/i.test(navigator.userAgent || '')
   const [config, setConfig] = useState<AppshotConfig>({
     platform: isWinClient ? 'win32' : 'darwin',
     shortcutMode: isWinClient ? 'double-ctrl' : 'double-cmd',
+    windowsHotkeys: { left: 'lctrl', right: 'rctrl' },
     soundEnabled: true,
     animationEnabled: true,
   })
@@ -30,6 +51,7 @@ export function AppshotSettingsSection() {
           setConfig({
             platform: isWin ? 'win32' : 'darwin',
             shortcutMode: data.shortcutMode ?? (isWin ? 'double-ctrl' : 'double-cmd'),
+            windowsHotkeys: data.windowsHotkeys ?? { left: 'lctrl', right: 'rctrl' },
             soundEnabled: data.soundEnabled ?? true,
             animationEnabled: data.animationEnabled ?? true,
           })
@@ -67,7 +89,18 @@ export function AppshotSettingsSection() {
     }
   }
 
+  // Windows 自定义修饰键：换键时保证两键不同（另一侧已占用则忽略）
+  const updateHotkeySide = (side: 'left' | 'right', key: WindowsModifierKey) => {
+    const hotkeys: WindowsHotkeys =
+      side === 'left'
+        ? { left: key, right: config.windowsHotkeys?.right ?? 'rctrl' }
+        : { left: config.windowsHotkeys?.left ?? 'lctrl', right: key }
+    if (hotkeys.left === hotkeys.right) return
+    void handleUpdate({ windowsHotkeys: hotkeys })
+  }
+
   const isWin = config.platform === 'win32' || isWinClient
+  const hotkeys = config.windowsHotkeys ?? { left: 'lctrl', right: 'rctrl' }
 
   return h('div', {
     style: {
@@ -125,25 +158,46 @@ export function AppshotSettingsSection() {
         h('div', null,
           h('div', { style: { fontWeight: 500, color: '#f4f4f5', marginBottom: '2px' } }, '触发快捷键'),
           h('div', { style: { fontSize: '12px', color: '#71717a' } }, '在任意应用前台触发窗口截屏的全局按键组合'),
+          // 自定义修饰键选择（仅 Windows 且选择自定义时展开；两键互斥）
+          isWin && config.shortcutMode === 'custom'
+            ? h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px' } },
+                h('select', {
+                  value: hotkeys.left,
+                  disabled: loading || saving,
+                  onChange: (e: React.ChangeEvent<HTMLSelectElement>) =>
+                    updateHotkeySide('left', e.target.value as WindowsModifierKey),
+                  style: selectStyle,
+                },
+                  ...MODIFIER_KEYS.map((k) =>
+                    h('option', { key: k, value: k, disabled: k === hotkeys.right }, MODIFIER_LABELS[k]),
+                  ),
+                ),
+                h('span', { style: { color: '#71717a', fontSize: '12px' } }, '+'),
+                h('select', {
+                  value: hotkeys.right,
+                  disabled: loading || saving,
+                  onChange: (e: React.ChangeEvent<HTMLSelectElement>) =>
+                    updateHotkeySide('right', e.target.value as WindowsModifierKey),
+                  style: selectStyle,
+                },
+                  ...MODIFIER_KEYS.map((k) =>
+                    h('option', { key: k, value: k, disabled: k === hotkeys.left }, MODIFIER_LABELS[k]),
+                  ),
+                ),
+              )
+            : null,
         ),
         h('select', {
           value: config.shortcutMode,
           disabled: loading || saving,
-          onChange: (e: React.ChangeEvent<HTMLSelectElement>) => handleUpdate({ shortcutMode: e.target.value as AppshotConfig['shortcutMode'] }),
-          style: {
-            background: '#27272a',
-            color: '#fafafa',
-            border: '1px solid rgba(255, 255, 255, 0.12)',
-            borderRadius: '8px',
-            padding: '6px 12px',
-            fontSize: '13px',
-            outline: 'none',
-            cursor: 'pointer',
-          },
+          onChange: (e: React.ChangeEvent<HTMLSelectElement>) =>
+            handleUpdate({ shortcutMode: e.target.value as AppshotConfig['shortcutMode'] }),
+          style: selectStyle,
         },
           ...(isWin
             ? [
-                h('option', { key: 'ctrl', value: 'double-ctrl' }, '左右 Ctrl 同时按（默认）'),
+                h('option', { key: 'ctrl', value: 'double-ctrl' }, '双 Ctrl 同时按（默认）'),
+                h('option', { key: 'custom', value: 'custom' }, '自定义修饰键组合'),
               ]
             : [
                 h('option', { key: 'cmd', value: 'double-cmd' }, '双击 ⌘ Command（或左右 ⌘ 同时按）'),
