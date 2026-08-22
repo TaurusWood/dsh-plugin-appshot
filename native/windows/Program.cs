@@ -335,6 +335,8 @@ internal static class Program
 
             // 落盘后用户反馈：快门音（防自截合同：仅在 PNG 已原子落盘后播放）
             if (_soundEnabled) UI.ShutterSound.Play();
+            // 目标窗口边框闪烁（同样仅在落盘后显示；不阻塞交付管线）
+            if (_animationEnabled) UI.CaptureFlash.Show(target.Bounds);
         }
         finally
         {
