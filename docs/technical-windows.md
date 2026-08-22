@@ -183,7 +183,7 @@
    - `EnumWindows` 按 Z 序（顶→底）枚举顶层窗口；过滤不可见（`!IsWindowVisible`）、最小化（`IsIconic`）、Cloaked（`DWMWA_CLOAKED`）与桌面/任务栏类名（`Progman`/`WorkerW`/`Shell_TrayWnd`/`Shell_SecondaryTrayWnd`）后，收集与 `rcMonitor` 相交的窗口；
    - 遮挡判定：候选与所有更高 Z 序可见窗口的边界做矩形相交，无相交即"完全可见"；
    - 裁决（纯逻辑，可单测）：唯一完全可见候选 → 它；多个并列完全可见（如分屏）→ 鼠标下顶层窗口（`WindowFromPoint` + `GA_ROOT`，不在并列集合则取第一个）；全部被遮挡 → Z 序第一个；
-   - DSH 自身窗口（`--dsh-pid`）不作候选，但**仍计为遮挡源**；
+   - DSH 自身窗口（`--dsh-pid`）：**为该屏 Z 序最前的有效窗口时直接以 `DSH_WINDOW` 拒绝**（不跳选其后的窗口）；位于其他窗口之后时仅计为遮挡源；
    - 无任何候选时显示 `NO_TARGET_WINDOW` 本地失败通知，不发送 `capture/request`；
 3. **有效捕获边界与跨屏判定**：
    - 通过 DWM 获取排除阴影后的真实可视物理外框 `DWMWA_EXTENDED_FRAME_BOUNDS`（失败用 `GetWindowRect` 兜底）；
