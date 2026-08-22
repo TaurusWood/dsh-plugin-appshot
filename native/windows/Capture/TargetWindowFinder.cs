@@ -60,6 +60,7 @@ public static class TargetWindowFinder
         // 1. EnumWindows 天然按 Z 序（顶→底）枚举；一次遍历同时收集遮挡源与候选
         var occluders = new List<Rect>();               // 可见普通窗口边界（遮挡判定源）
         var candidates = new List<TopmostCandidate>();  // Z 序可捕获候选
+        bool dshOnTop = false;
         NativeMethods.EnumWindows((hwnd, _) =>
         {
             if (!NativeMethods.IsWindowVisible(hwnd) || NativeMethods.IsIconic(hwnd)) return true;
@@ -78,12 +79,27 @@ public static class TargetWindowFinder
             if (bounds.IsEmpty || !RectsIntersect(bounds, monitorRect))
                 return true; // 不在鼠标屏：与本屏裁决无关
 
+            if (isDsh)
+            {
+                // 清晰边界：DSH 是该屏 Z 序最前的有效窗口 → 直接拒绝截图；
+                // DSH 位于其他窗口之后时仅作为遮挡源参与裁决
+                if (candidates.Count == 0)
+                {
+                    dshOnTop = true;
+                    return false;
+                }
+                occluders.Add(bounds);
+                return true;
+            }
+
             bool occluded = occluders.Any(o => RectsIntersect(o, bounds));
             occluders.Add(bounds);
-            if (!isDsh) candidates.Add(new TopmostCandidate(hwnd, bounds, occluded));
+            candidates.Add(new TopmostCandidate(hwnd, bounds, occluded));
             return true;
         }, IntPtr.Zero);
 
+        if (dshOnTop)
+            return new TargetWindowResolveResult(null, TargetError.DshWindow);
         if (candidates.Count == 0)
             return new TargetWindowResolveResult(null, TargetError.NoTargetWindow);
 

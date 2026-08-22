@@ -361,7 +361,7 @@ internal static class Program
         string text = error switch
         {
             TargetError.NoTargetWindow => "截图失败：未识别到目标窗口",
-            TargetError.DshWindow => "截图失败：目标为 DSH 自身窗口",
+            TargetError.DshWindow => "截图失败：最前窗口为 DSH，已跳过截图",
             TargetError.Desktop => "截图失败：目标为桌面",
             TargetError.Taskbar => "截图失败：目标为任务栏",
             TargetError.Cloaked => "截图失败：目标窗口不可见",
