@@ -8,6 +8,8 @@
     <LangVersion>12</LangVersion>
     <AssemblyName>appshot-win-x64</AssemblyName>
     <RootNamespace>AppshotWin</RootNamespace>
+    <!-- 托管 UIA（System.Windows.Automation）依赖 WindowsDesktop 框架引用 -->
+    <UseWPF>true</UseWPF>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>true</SelfContained>

@@ -6,6 +6,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <IsPackable>false</IsPackable>
     <LangVersion>12</LangVersion>
+    <!-- 主工程 UseWPF 引入 WindowsDesktop 8.0 框架引用；测试机无 8.0 桌面运行时，允许在更高版本上运行 -->
+    <RollForward>LatestMajor</RollForward>
   </PropertyGroup>
 
   <ItemGroup>
