@@ -20,6 +20,7 @@ import { WindowsCaptureStateMachine } from './state-machine.ts'
 import { registerWindowsRoutes, type WindowsWebServerLike } from './http-routes.ts'
 import { startWindowsAgent, type WindowsAgentProcess } from './agent.ts'
 import { cleanOrphanWindowsStagingDirs, ingestWindowsScreenshot, writeInstanceLock } from './safe-ingest.ts'
+import { DEFAULT_WINDOWS_CONFIG, loadWindowsConfig, resolveConfigStorePath, saveWindowsConfig } from './config-store.ts'
 import type { WindowsNativeToNodeFrame } from './types.ts'
 import type { AppshotConfig, WindowsHotkeys } from '../shared/types.ts'
 
@@ -32,6 +33,8 @@ export interface WindowsHostContext {
 export interface ApplyWindowsOptions {
   /** 覆盖 staging 根目录（测试/调试用），默认 os.tmpdir()/dsh-appshot。 */
   stagingRoot?: string
+  /** 覆盖配置持久化文件路径（测试/调试用），默认 %APPDATA%/dsh-plugin-appshot/config.json。 */
+  configPath?: string
   /** 是否启动 Agent 子进程（默认 true；DSH_DISABLE_AGENT_SPAWN=1 时强制关闭）。 */
   spawnAgent?: boolean
 }
@@ -69,6 +72,7 @@ export async function applyWindows(ctx: WindowsHostContext, options: ApplyWindow
   const instanceId = randomUUID()
   const stagingRoot = options.stagingRoot ?? join(tmpdir(), 'dsh-appshot')
   const stagingDir = join(stagingRoot, `${process.pid}-${instanceId}`)
+  const configPath = options.configPath ?? resolveConfigStorePath()
   await writeInstanceLock(stagingDir, { ownerPid: process.pid, instanceId })
 
   // 启动孤儿 GC（不阻塞）
@@ -180,14 +184,9 @@ export async function applyWindows(ctx: WindowsHostContext, options: ApplyWindow
     }
   }
 
-  // 维护 Windows 配置状态（默认双 Ctrl）
-  let currentConfig: AppshotConfig = {
-    platform: 'win32',
-    shortcutMode: 'double-ctrl',
-    windowsHotkeys: { left: 'lctrl', right: 'rctrl' },
-    soundEnabled: true,
-    animationEnabled: true,
-  }
+  // 维护 Windows 配置状态：默认值 + 启动时持久化文件合并（字段级校验见 config-store）
+  const storedConfig = await loadWindowsConfig(configPath)
+  let currentConfig: AppshotConfig = { ...DEFAULT_WINDOWS_CONFIG, ...storedConfig }
 
   // 配置热下发：键位/音效/动画即时同步 Native（config/update 帧）
   const sendConfigToAgent = () => {
@@ -211,6 +210,10 @@ export async function applyWindows(ctx: WindowsHostContext, options: ApplyWindow
     onConfigUpdate: (next) => {
       currentConfig = { ...next, platform: 'win32' }
       console.log('[dsh-plugin-appshot] windows config updated:', currentConfig)
+      // 持久化失败不阻断热生效（内存配置 + config/update 帧已下发）
+      void saveWindowsConfig(configPath, currentConfig).then((ok) => {
+        if (!ok) console.warn('[dsh-plugin-appshot] windows config persist failed:', configPath)
+      })
       sendConfigToAgent()
     },
     onW0Report: (report) => {

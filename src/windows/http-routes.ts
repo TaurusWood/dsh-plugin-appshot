@@ -49,7 +49,8 @@ export interface WindowsWebServerLike {
   }): () => void
 }
 
-import type { AppshotConfig, WindowsModifierKey } from '../shared/types.ts'
+import type { AppshotConfig } from '../shared/types.ts'
+import { isValidWindowsHotkeys } from '../shared/types.ts'
 
 export interface WindowsRoutesOptions {
   machine: WindowsCaptureStateMachine
@@ -125,12 +126,6 @@ const deliveryStatuses: readonly WindowsDeliveryResultStatus[] = ['MOUNTED', 'BU
 
 function isDeliveryResultStatus(value: string): value is WindowsDeliveryResultStatus {
   return (deliveryStatuses as readonly string[]).includes(value)
-}
-
-const modifierKeys: readonly string[] = ['lctrl', 'rctrl', 'lalt', 'ralt', 'lshift', 'rshift']
-
-function isModifierKey(value: string): value is WindowsModifierKey {
-  return modifierKeys.includes(value)
 }
 
 /** 注册全部 Windows 路由；返回注销函数。 */
@@ -302,10 +297,15 @@ export function registerWindowsRoutes(ctx: { webServer?: WindowsWebServerLike },
           const targetSessionId = typeof raw.targetSessionId === 'string' ? raw.targetSessionId : ''
           const status = typeof raw.status === 'string' ? raw.status : ''
 
+          // NO_SESSION 场景客户端无可传的会话 ID（ready 帧 targetSessionId 即为 null），
+          // 放行空串；其余状态必须携带合法 sessionId
+          const targetSessionIdValid =
+            status === 'NO_SESSION' ? targetSessionId === '' : isValidSessionId(targetSessionId)
+
           if (
             !isValidCaptureId(captureId) ||
             !isValidClientInstanceId(clientInstanceId) ||
-            !isValidSessionId(targetSessionId) ||
+            !targetSessionIdValid ||
             !isDeliveryResultStatus(status)
           ) {
             sendJson(res, 400, { error: 'INVALID_FIELDS' })

@@ -48,6 +48,20 @@ export interface AppshotConfig {
 /** Windows 触发键修饰键池（lctrl=0xA2 / rctrl=0xA3 / lalt=0xA4 / ralt=0xA5 / lshift=0xA0 / rshift=0xA1）；Win 因开始菜单副作用排除。 */
 export type WindowsModifierKey = 'lctrl' | 'rctrl' | 'lalt' | 'ralt' | 'lshift' | 'rshift'
 
+export const WINDOWS_MODIFIER_KEYS: readonly WindowsModifierKey[] = [
+  'lctrl', 'rctrl', 'lalt', 'ralt', 'lshift', 'rshift',
+]
+
+export function isWindowsModifierKey(value: unknown): value is WindowsModifierKey {
+  return typeof value === 'string' && (WINDOWS_MODIFIER_KEYS as readonly string[]).includes(value)
+}
+
+export function isValidWindowsHotkeys(value: unknown): value is WindowsHotkeys {
+  if (value === null || typeof value !== 'object') return false
+  const hk = value as { left?: unknown; right?: unknown }
+  return isWindowsModifierKey(hk.left) && isWindowsModifierKey(hk.right) && hk.left !== hk.right
+}
+
 export interface WindowsHotkeys {
   left: WindowsModifierKey
   right: WindowsModifierKey
