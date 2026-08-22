@@ -176,23 +176,19 @@
 ### 3.3 触发坐标锁定与目标规范化
 1. **先同步隐藏通知并锁定 visible backup**：
    - 工作线程从队列取出触发事件后，第一步同步隐藏所有活动通知窗口；
-   - 使用 Hook 采样的 `cursorPt` 完成窗口命中、边界校验并立刻保存 visible backup；
+   - 使用 Hook 采样的 `cursorPt` 确定**操作显示器**（`MonitorFromPoint` → `rcMonitor`），随后完成 Z 序目标裁决、边界校验并立刻保存 visible backup；
    - 随后发送 `capture/request`，在收到 Node 的 `IN_FLIGHT` 接受确认前，严禁置前、编码或写盘；
    - 收到 `BUSY` / `NO_CLIENT` 或 1000ms 内未收到接受确认时，释放 backup 并结束，不改变目标窗口层级；`NO_CLIENT` 明确提示打开 DSH 后重试。
-2. **窗口句柄查找与规范化**：
-   - 使用触发瞬间采样的 `cursorPt` 调用 `HWND leafHwnd = WindowFromPoint(cursorPt)`；
-   - 若 `leafHwnd == IntPtr.Zero`，显示 `NO_TARGET_WINDOW` 本地失败通知，不发送 `capture/request`；
-   - **规范化规则**：先调用 `HWND topHwnd = GetAncestor(leafHwnd, GA_ROOT)` 获取顶层窗口；
-   - Windows Basic 不做 `GA_ROOTOWNER` 启发式归并；Tooltip、菜单和浮动工具窗作为独立顶层目标，避免把用户明确悬停的窗口静默替换成宿主主窗口；
-3. **无效与系统窗口排除**：
-   - 排除不可见窗口（`!IsWindowVisible(topHwnd)`）与已最小化窗口（`IsIconic(topHwnd)`）；
-   - 排除系统桌面（类名 `Progman` / `WorkerW`）与任务栏（`Shell_TrayWnd`）；
-   - 排除 DSH 自身的窗口（匹配 `--dsh-pid` 注入的 PID）；
-   - 排除 Cloaked 窗口（`DwmGetWindowAttribute(topHwnd, DWMWA_CLOAKED, ...)`）；
-4. **有效捕获边界与跨屏判定**：
-   - 通过 DWM 获取排除阴影后的真实可视物理外框 `DWMWA_EXTENDED_FRAME_BOUNDS`；
-   - 调用 `GetMonitorInfo` 并使用完整显示器物理边界 `MONITORINFO.rcMonitor`；`rcWork` 仅用于通知定位；
-   - **跨屏硬约束**：若外框超出 `rcMonitor`，直接显示 `WINDOW_ACROSS_MONITORS` 本地失败通知并终止，不发送 `capture/request`。
+2. **Z 序目标裁决（EnumWindows）**：
+   - `EnumWindows` 按 Z 序（顶→底）枚举顶层窗口；过滤不可见（`!IsWindowVisible`）、最小化（`IsIconic`）、Cloaked（`DWMWA_CLOAKED`）与桌面/任务栏类名（`Progman`/`WorkerW`/`Shell_TrayWnd`/`Shell_SecondaryTrayWnd`）后，收集与 `rcMonitor` 相交的窗口；
+   - 遮挡判定：候选与所有更高 Z 序可见窗口的边界做矩形相交，无相交即"完全可见"；
+   - 裁决（纯逻辑，可单测）：唯一完全可见候选 → 它；多个并列完全可见（如分屏）→ 鼠标下顶层窗口（`WindowFromPoint` + `GA_ROOT`，不在并列集合则取第一个）；全部被遮挡 → Z 序第一个；
+   - DSH 自身窗口（`--dsh-pid`）不作候选，但**仍计为遮挡源**；
+   - 无任何候选时显示 `NO_TARGET_WINDOW` 本地失败通知，不发送 `capture/request`；
+3. **有效捕获边界与跨屏判定**：
+   - 通过 DWM 获取排除阴影后的真实可视物理外框 `DWMWA_EXTENDED_FRAME_BOUNDS`（失败用 `GetWindowRect` 兜底）；
+   - 使用完整显示器物理边界 `MONITORINFO.rcMonitor`；`rcWork` 仅用于通知定位；
+   - **跨屏硬约束**：若选中目标外框超出 `rcMonitor`，直接显示 `WINDOW_ACROSS_MONITORS` 本地失败通知并终止（不裁剪、不拼接、不跳选下一个），不发送 `capture/request`。
 
 ### 3.4 截图两阶段执行（置前与可见降级）
 
