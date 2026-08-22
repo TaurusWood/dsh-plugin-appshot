@@ -2,6 +2,45 @@
 
 [English](./CHANGELOG.md) | [简体中文](./CHANGELOG.zh-CN.md)
 
+# [0.3.0](https://github.com/TaurusWood/dsh-plugin-appshot/compare/v0.2.0...v0.3.0) (2026-08-22)
+
+
+### Bug Fixes
+
+* **client:** make settings panel follow DSH light/dark theme ([2e99fa0](https://github.com/TaurusWood/dsh-plugin-appshot/commit/2e99fa0643789cb92fbd122f674bc012c6a49f1f))
+* **packaging:** ship windows agent in npm package with dual-runner release ([e0824d4](https://github.com/TaurusWood/dsh-plugin-appshot/commit/e0824d4a7976ecbaf0798f56b447fb35af003e17))
+* **windows:** accept empty targetSessionId for NO_SESSION ACK ([db08b02](https://github.com/TaurusWood/dsh-plugin-appshot/commit/db08b024c43a208b8b7bf41d9933f68628352997))
+* **windows:** add PENDING_ACK timeout guard to unstick delivery ([d1c68e6](https://github.com/TaurusWood/dsh-plugin-appshot/commit/d1c68e6cdcc514389c02378a4be1eab4b23daf6b))
+* **windows:** capture flash window was fully transparent ([bc87ec2](https://github.com/TaurusWood/dsh-plugin-appshot/commit/bc87ec2d85973bfd8aebec8be1d7a3d7efc545cd)), closes [hi#DPI](https://github.com/hi/issues/DPI)
+* **windows:** flyin diagnostics, stream-lifetime and UIA STA; accent-color flash ([2ddfc1c](https://github.com/TaurusWood/dsh-plugin-appshot/commit/2ddfc1c8ac586ee2ace12dc3d0f182c54f7b593f))
+* **windows:** flyin never played - bad P/Invoke entry point and exact-match UIA name ([61f7f16](https://github.com/TaurusWood/dsh-plugin-appshot/commit/61f7f166659d11fb37bb97dcf8a2d8c290a68c3c))
+* **windows:** persist plugin config across host restarts ([0ed852a](https://github.com/TaurusWood/dsh-plugin-appshot/commit/0ed852a4339b49276beb9b23478c8f1bd10f2fb1))
+* **windows:** refuse capture when DSH is the frontmost window ([2ab2344](https://github.com/TaurusWood/dsh-plugin-appshot/commit/2ab234472fc29f6990bebb32dc91c6ad4a426649))
+* **windows:** start feedback in parallel and remove flyin jank ([1a4789e](https://github.com/TaurusWood/dsh-plugin-appshot/commit/1a4789eb34d0f230806d42052c00879377b0b7e6))
+* **windows:** unify capture timing domain and harden agent after live debugging ([0872121](https://github.com/TaurusWood/dsh-plugin-appshot/commit/087212166f7b9af1673f91871a5d7001c7a62ff7))
+
+
+### Features
+
+* **windows:** capture flash border animation ([880d102](https://github.com/TaurusWood/dsh-plugin-appshot/commit/880d102a46d74092751805d552c93884476eb3a4))
+* **windows:** enhance client draft claiming, ACK backoff, and storage index (W4) ([762b0fd](https://github.com/TaurusWood/dsh-plugin-appshot/commit/762b0fd8dadf1d8e67ffb59d6968ef76c3e5919c))
+* **windows:** fly-in animation of capture thumbnail to taskbar DSH icon ([b24423b](https://github.com/TaurusWood/dsh-plugin-appshot/commit/b24423b02a62adad23912f640f5556441da62b4f)), closes [hi#quality](https://github.com/hi/issues/quality)
+* **windows:** hotkey config IPC and modifier key customization ([bead58b](https://github.com/TaurusWood/dsh-plugin-appshot/commit/bead58bf7bb963a9ca1d4241b57d9c6f945f484a))
+* **windows:** hotkey recorder control with Shift-enabled modifier pool ([7accabf](https://github.com/TaurusWood/dsh-plugin-appshot/commit/7accabf814dae736883468655a6b1515add25d87))
+* **windows:** implement client draft recovery, silent mounting, and dual-platform branching (W4) ([ce4bd35](https://github.com/TaurusWood/dsh-plugin-appshot/commit/ce4bd35e1816cd054cb299bfb6b50a681a8d4082))
+* **windows:** implement host state machine, safe ingest, and HTTP transport (W2/W3) ([718bb1e](https://github.com/TaurusWood/dsh-plugin-appshot/commit/718bb1ead1cf412513173a6d757737e638732c91))
+* **windows:** implement Windows Native Agent (Phase W1/W2) ([ca613c6](https://github.com/TaurusWood/dsh-plugin-appshot/commit/ca613c6ad59c4ebae97bb0d39fcb649430f1fffa))
+* **windows:** louder and crisper shutter sound ([df1168c](https://github.com/TaurusWood/dsh-plugin-appshot/commit/df1168c6057e72ac06ab6ffbf50663b3b08defc2))
+* **windows:** replace synthesized shutter with real camera sample ([c235d22](https://github.com/TaurusWood/dsh-plugin-appshot/commit/c235d2204763e28d31c286d06d9ad697e58d0643))
+* **windows:** settings panel hotkey customization UI ([c1dffb2](https://github.com/TaurusWood/dsh-plugin-appshot/commit/c1dffb294ef1c5dd1110e32fcf0a95b51b3b21d7))
+* **windows:** shutter sound feedback after PNG flush ([a31ddf5](https://github.com/TaurusWood/dsh-plugin-appshot/commit/a31ddf5ae66e8ce1181d59ca05e68840111cf9cd))
+* **windows:** target the topmost window on the cursor's monitor ([5452dcd](https://github.com/TaurusWood/dsh-plugin-appshot/commit/5452dcd7b49f4a3c054d6dfc3c52f9992acd3453))
+
+
+### Performance Improvements
+
+* **windows:** 60fps flyin with high-resolution timer and smoother easing ([95c958d](https://github.com/TaurusWood/dsh-plugin-appshot/commit/95c958d06a23d9f7aef122f9c73fc7889a10004c)), closes [hi#resolution](https://github.com/hi/issues/resolution) [hi#resolution](https://github.com/hi/issues/resolution)
+
 # [0.2.0](https://github.com/TaurusWood/dsh-plugin-appshot/compare/v0.1.2...v0.2.0) (2026-08-17)
 
 
