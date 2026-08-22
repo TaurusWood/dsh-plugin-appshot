@@ -21,10 +21,12 @@ public static class CaptureFlash
     private const int WS_EX_TRANSPARENT = 0x00000020;
     private const int WS_EX_LAYERED = 0x00080000;
     private const uint WS_POPUP = 0x80000000;
-    private const int BorderPad = 3;
+    private const int BorderPad = 6; // 物理像素；高 DPI 屏上过细不可见
     private const int TotalDurationMs = 350;
-    private static readonly NativeMethods.WndProc WndProc = (_, msg, _, _) =>
-        NativeMethods.DefWindowProc(IntPtr.Zero, msg, IntPtr.Zero, IntPtr.Zero);
+    // 窗口过程必须原样转发 hwnd：DefWindowProc 依据 hwnd 查找类背景刷，
+    // 丢失句柄会导致 WM_ERASEBKGND 不绘制、layered 窗口表面全透明（不可见）。
+    private static readonly NativeMethods.WndProc WndProc = (hwnd, msg, wParam, lParam) =>
+        NativeMethods.DefWindowProc(hwnd, msg, wParam, lParam);
 
     private static bool _classRegistered;
     private static int _busy;
