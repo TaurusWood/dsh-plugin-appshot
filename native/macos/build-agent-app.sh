@@ -20,8 +20,9 @@ echo "==> binary: $BIN"
 
 echo "==> assembling $APP"
 rm -rf "$APP"
-mkdir -p "$APP/Contents/MacOS"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
+cp Resources/shutter.wav "$APP/Contents/Resources/shutter.wav" 2>/dev/null || true
 cp "$BIN" "$APP/Contents/MacOS/appshot-macos"
 
 echo "==> codesign (ad-hoc)"

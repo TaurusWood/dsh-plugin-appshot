@@ -26,8 +26,9 @@ swiftc -O -parse-as-library \
     -module-cache-path "${CACHE_DIR}"
 chmod 755 "${MACOS_DIR}/appshot-macos"
 
-echo "[build-app] 3. Copying Info.plist..."
+echo "[build-app] 3. Copying Resources..."
 cp "${ROOT_DIR}/Resources/Info.plist" "${CONTENTS_DIR}/Info.plist"
+cp "${ROOT_DIR}/Resources/shutter.wav" "${RESOURCES_DIR}/shutter.wav" 2>/dev/null || true
 
 echo "[build-app] 4. Code signing App Bundle..."
 codesign --force --deep --sign - "${APP_BUNDLE}"
