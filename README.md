@@ -38,7 +38,7 @@ DSH 版的「[Codex Appshots](https://developers.openai.com/codex/appshots)」�
 按下 左⌘+右⌘  →  截取当前前台窗口  →  截图挂入 Composer  →  输入描述并 Send
 ```
 
-目前支持 **macOS 14+**（默认双 ⌘ Command）与 **Windows 10 19041+**（默认双 Ctrl，可在设置面板自定义修饰键组合）。
+目前支持 **macOS 14+**（默认左右 ⌘ Command，可在设置面板切换为双击 ⌘ 等）与 **Windows 10 19041+**（默认双 Ctrl，可在设置面板自定义修饰键组合）。
 
 ## 使用
 
@@ -71,9 +71,9 @@ DSH 版的「[Codex Appshots](https://developers.openai.com/codex/appshots)」�
 
 **macOS**
 
-- **全局双 Command 快捷键**：左 ⌘ + 右 ⌘ 组合状态机触发（与 Codex Appshots 同款），带冷却防抖，DSH 在后台/最小化时也能响应。
+- **全局左右 Command 快捷键**：左 ⌘ + 右 ⌘ 组合状态机触发（与 Codex Appshots 同款），带冷却防抖，DSH 在后台/最小化时也能响应；支持在设置中切换为双击 Command 等模式。
 - **ScreenCaptureKit 单窗口截图**：过滤透明层、Shadow、Tooltip，保留 Retina 高清分辨率；多显示器下只截目标窗口所在屏幕。
-- **先截后唤（防自截）**：截图完成并落盘后，才由 Native Agent 唤起并置顶 DSH 主窗口，杜绝竞态导致「截到 DSH 自己」。
+- **先截后唤（防自截）**：截图完成并落盘后，才由 Native Agent 唤起并置顶 DSH 主窗口，杜绝竞态导致「截到 DSH 自己」；若当前聚焦在 DSH 窗口本身则自动忽略不误截。
 - **SSE 推送挂载**：截图经宿主 `saveImage` 持久化为 DSH Attachment 后，经自建 SSE 通道推送客户端，自动挂到活跃 Session 并聚焦输入框。
 - **权限反馈**：缺少 Screen Recording / Accessibility 权限时弹出系统授权引导，并用系统通知（`UNUserNotificationCenter`）提示失败原因。
 
@@ -110,7 +110,7 @@ DSH 版的「[Codex Appshots](https://developers.openai.com/codex/appshots)」�
 
 关键设计：
 
-- **防自截硬约束**：任何模块在截图落盘前都禁止唤起/显示/聚焦 DSH 窗口；窗口唤起是 Native 能力（`NSRunningApplication`），不是 DSH API。
+- **防自截硬约束**：任何模块在截图落盘前都禁止唤起/显示/聚焦 DSH 窗口；窗口唤起是 Native 能力（`NSRunningApplication`），不是 DSH API；若当前聚焦在 DSH 窗口本身则自动忽略不截。
 - **确定性所有权转移（Single Owner）**：`saveImage` 成功前 Staging 文件归插件；成功后所有权移交 DSH AttachmentStore，插件立即 `unlink`；失败分支 `finally` 清理；启动时执行孤儿文件 GC。
 
 ## 权限
@@ -129,7 +129,7 @@ DSH 版的「[Codex Appshots](https://developers.openai.com/codex/appshots)」�
 - 支持 **macOS 14+** 与 **Windows 10 19041+**（自包含单文件 Agent，无需安装 .NET 运行时）；WebUI 暂不支持（浏览器沙箱无法获取全局快捷键或跨应用置顶）。
 - 窗口唤起仅对 DSH 桌面端（macOS）生效；`dsh web` 下截图仍可入 Composer，但不唤起/置顶窗口；Windows 按「防自截」设计不唤起 DSH，截图静默进入输入框。
 - 不含区域框选、全屏截图、图片标注、OCR 与历史图库管理（均为后续规划）。
-- 快捷键：macOS 默认双 Command；Windows 默认双 Ctrl，可在 DSH 设置 → 截图捕获 中自定义修饰键组合，并开关快门音与截图动画（配置跨重启保留）。
+- 快捷键：macOS 默认左右 Command（同时按，可在设置中切换为双击 Command 等）；Windows 默认双 Ctrl，可在 DSH 设置 → 截图捕获 中自定义修饰键组合，并开关快门音与截图动画（配置跨重启保留）。
 
 ## 开发
 

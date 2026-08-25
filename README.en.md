@@ -38,7 +38,7 @@ A DSH take on "[Codex Appshots](https://developers.openai.com/codex/appshots)": 
 Press Left ⌘ + Right ⌘  →  capture frontmost window  →  image lands in composer  →  describe and Send
 ```
 
-Currently supports **macOS 14+** (double ⌘ Command by default) and **Windows 10 19041+** (double Ctrl by default, remappable in the settings panel).
+Currently supports **macOS 14+** (Left ⌘ + Right ⌘ by default, remappable in settings) and **Windows 10 19041+** (double Ctrl by default, remappable in the settings panel).
 
 ## Usage
 
@@ -46,7 +46,7 @@ Currently supports **macOS 14+** (double ⌘ Command by default) and **Windows 1
 
     **What happens next differs per platform:**
 
-    - **macOS**: after the screenshot lands on disk, the DSH window is activated and focused (capture-then-activate — DSH can never appear in its own screenshot; window activation applies to the DSH desktop app only — under `dsh web` the image still lands in the composer, just without the window activation).
+    - **macOS**: after the screenshot lands on disk, the DSH window is activated and focused (capture-then-activate — DSH can never appear in its own screenshot; if DSH is already focused, screenshot is automatically ignored; window activation applies to the DSH desktop app only — under `dsh web` the image still lands in the composer, just without the window activation).
     - **Windows**: **DSH is never activated** — the screenshot silently lands in the current session's input box without interrupting your work; success is signaled by a shutter sound and a fly-in animation (both disableable), and failures surface in a **no-focus-stealing** lightweight toast.
 
 | Before trigger (frontmost app window; screenshots show macOS) | After trigger (captured & mounted into Composer) |
@@ -71,9 +71,9 @@ Currently supports **macOS 14+** (double ⌘ Command by default) and **Windows 1
 
 **macOS**
 
-- **Global double-Command hotkey**: Left ⌘ + Right ⌘ state machine (the same trigger Codex Appshots uses), with debounce/cooldown; responds even while DSH is in the background or minimized.
+- **Global Dual-Command hotkey**: Left ⌘ + Right ⌘ state machine (the same trigger Codex Appshots uses), with debounce/cooldown; responds even while DSH is in the background or minimized; remappable in settings (e.g. double-tap ⌘).
 - **ScreenCaptureKit single-window capture**: transparent layers, shadows and tooltips filtered out, Retina resolution preserved; on multi-display setups only the target window's screen is captured.
-- **Capture-then-activate (no self-capture)**: the DSH window is activated and brought to front only after the screenshot has been taken and written to disk — no race condition that could "screenshot DSH itself".
+- **Capture-then-activate (no self-capture)**: the DSH window is activated and brought to front only after the screenshot has been taken and written to disk — no race condition that could "screenshot DSH itself"; if DSH itself is focused, capture is cleanly ignored.
 - **SSE push mounting**: the host persists the screenshot via `saveImage` as a DSH Attachment, pushes it over a self-hosted SSE channel, and the client module mounts it into the active session and focuses the input.
 - **Permission feedback**: missing Screen Recording / Accessibility permissions trigger the system authorization prompt, plus a system notification (`UNUserNotificationCenter`) with the failure reason.
 
@@ -93,7 +93,7 @@ Three components, one-way data flow:
 ┌──────────────────────────┐     NDJSON IPC (stdio)     ┌───────────────────────────┐
 │  macOS Native Agent       │ ────────────────────────▶  │  Node / Cordis host plugin │
 │  (Appshot Agent.app)      │    type: "appshot"         │  (src/)                    │
-│  · Double-Command FSM     │                            │  · fs.readFile bytes        │
+│  · Dual-Command FSM       │                            │  · fs.readFile bytes        │
 │  · Frontmost-window pick  │                            │  · attachments.saveImage    │
 │  · ScreenCaptureKit shot  │                            │  · ownership transfer+unlink│
 │  · activate DSH after     │                            │  · webServer SSE broadcast  │
@@ -129,7 +129,7 @@ If you deny, the capture is aborted with a system notification; re-grant in Syst
 - Supports **macOS 14+** and **Windows 10 19041+** (self-contained single-file agent — no .NET runtime install needed); WebUI is not supported (a browser sandbox can't access global hotkeys or cross-app activation).
 - Window activation applies to the DSH desktop app (macOS) only; under `dsh web` screenshots still land in the composer, but the window is not activated/brought to front; Windows follows the anti-self-capture design and never activates DSH — screenshots silently land in the composer input.
 - No region selection, full-screen capture, image annotation, OCR, or screenshot history (all on the roadmap).
-- Hotkeys: double-Command by default on macOS; double-Ctrl by default on Windows, remappable in DSH Settings → Screenshot Capture, which also toggles the shutter sound and capture animation (settings persist across restarts).
+- Hotkeys: Left ⌘ + Right ⌘ (Dual Command) by default on macOS; double-Ctrl by default on Windows, remappable in DSH Settings → Screenshot Capture, which also toggles the shutter sound and capture animation (settings persist across restarts).
 
 ## Development
 
