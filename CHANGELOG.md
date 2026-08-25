@@ -2,6 +2,13 @@
 
 [English](./CHANGELOG.md) | [简体中文](./CHANGELOG.zh-CN.md)
 
+## [0.3.3](https://github.com/TaurusWood/dsh-plugin-appshot/compare/v0.3.2...v0.3.3) (2026-08-24)
+
+
+### Bug Fixes
+
+* Optimize Windows package size ([1e9613a](https://github.com/TaurusWood/dsh-plugin-appshot/commit/1e9613af08366fab8ef506d3993e740e9fb5e7b5))
+
 ## [0.3.2](https://github.com/TaurusWood/dsh-plugin-appshot/compare/v0.3.1...v0.3.2) (2026-08-22)
 
 
@@ -91,16 +98,16 @@
 
 ### Features
 
-* **client:** 实现客户端模块 SSE 消费、Composer 挂载与防自截全链路验证 (Phase 5 T5.1/T5.2) ([532c6e4](https://github.com/TaurusWood/dsh-plugin-appshot/commit/532c6e4850645036c9732d3e2d2c433e14614ec0))
 * **client:** decode image bytes from sse frame and mount to composer draft ([294a7e6](https://github.com/TaurusWood/dsh-plugin-appshot/commit/294a7e69d88f2e75daddd745301e913c325f6ff4))
+* **client:** 实现客户端模块 SSE 消费、Composer 挂载与防自截全链路验证 (Phase 5 T5.1/T5.2) ([532c6e4](https://github.com/TaurusWood/dsh-plugin-appshot/commit/532c6e4850645036c9732d3e2d2c433e14614ec0))
 * **host,native:** activate and focus dsh window on screenshot completion ([e4f074e](https://github.com/TaurusWood/dsh-plugin-appshot/commit/e4f074e848f699ca8262e2c931817a0f7ae0bda1))
 * **host:** wire agent lifecycle and broadcast image bytes via sse ([d1fbd3d](https://github.com/TaurusWood/dsh-plugin-appshot/commit/d1fbd3d1c76a4fd7d5fba4e432f264f70a6ae1de))
 * **ipc:** 实现长连接流式 NDJSON IPC 协议契约与解析器 (Phase 3 T3.2) ([ea5ab0e](https://github.com/TaurusWood/dsh-plugin-appshot/commit/ea5ab0e8daab14f5a654cdcdd2ca2c948e05cf5d))
-* **native:** 构建 macOS 后台 Agent.app 与权限检测/原生窗口唤起 (Phase 2 T2.1/T2.2) ([b4bee7f](https://github.com/TaurusWood/dsh-plugin-appshot/commit/b4bee7fcd8e8319922ddaceebff32f6ab9140729))
+* **native:** add 1.0s trigger cooldown and busy lock to DoubleCommandMonitor ([7484582](https://github.com/TaurusWood/dsh-plugin-appshot/commit/7484582cb97e2039062e368be2cb640a547e3656))
 * **native:** 实现 ScreenCaptureKit 单窗口截图与前台窗口过滤识别 (Phase 1 T1.1/T1.2) ([77100db](https://github.com/TaurusWood/dsh-plugin-appshot/commit/77100db549772d436980c4b7e03d8297d952dc04))
 * **native:** 实现全局双 Command 按键状态机与守护进程模式 (Phase 3 T3.1) ([635dc88](https://github.com/TaurusWood/dsh-plugin-appshot/commit/635dc88a93bf791fb0533c7840295d9866ab1c9c))
-* **native:** add 1.0s trigger cooldown and busy lock to DoubleCommandMonitor ([7484582](https://github.com/TaurusWood/dsh-plugin-appshot/commit/7484582cb97e2039062e368be2cb640a547e3656))
-* **plugin:** 改造 Cordis 插件架构模式与服务依赖 (Phase 0 T0.1) ([1fc4994](https://github.com/TaurusWood/dsh-plugin-appshot/commit/1fc499431b6af68909487db175c8facee3b1f492))
+* **native:** 构建 macOS 后台 Agent.app 与权限检测/原生窗口唤起 (Phase 2 T2.1/T2.2) ([b4bee7f](https://github.com/TaurusWood/dsh-plugin-appshot/commit/b4bee7fcd8e8319922ddaceebff32f6ab9140729))
 * **plugin:** 实现 Attachment 字节持久化、原子所有权转移与孤儿 GC (Phase 4 T4.2) ([dad3e38](https://github.com/TaurusWood/dsh-plugin-appshot/commit/dad3e38061c00989fe649d4c74694fa95872362b))
 * **plugin:** 实现 Native Agent 进程生命周期管控与就绪握手 (Phase 4 T4.1) ([1a956c9](https://github.com/TaurusWood/dsh-plugin-appshot/commit/1a956c901048d77bfc6da195ea89d7bc260a96d1))
+* **plugin:** 改造 Cordis 插件架构模式与服务依赖 (Phase 0 T0.1) ([1fc4994](https://github.com/TaurusWood/dsh-plugin-appshot/commit/1fc499431b6af68909487db175c8facee3b1f492))
 * **plugin:** 注册 WebServer SSE 广播通道并实现事件分发 (Phase 4 T4.3) ([322a05c](https://github.com/TaurusWood/dsh-plugin-appshot/commit/322a05c5dabf25c9e8ca5a071f7dad01240cd368))
