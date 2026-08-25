@@ -44,7 +44,7 @@ export function AppshotSettingsSection() {
   const isWinClient = typeof navigator !== 'undefined' && /Win/i.test(navigator.userAgent || '')
   const [config, setConfig] = useState<AppshotConfig>({
     platform: isWinClient ? 'win32' : 'darwin',
-    shortcutMode: isWinClient ? 'double-ctrl' : 'double-cmd',
+    shortcutMode: isWinClient ? 'double-ctrl' : 'dual-cmd',
     windowsHotkeys: { left: 'lctrl', right: 'rctrl' },
     soundEnabled: true,
     animationEnabled: true,
@@ -63,7 +63,7 @@ export function AppshotSettingsSection() {
           const isWin = data.platform === 'win32' || isWinClient
           setConfig({
             platform: isWin ? 'win32' : 'darwin',
-            shortcutMode: data.shortcutMode ?? (isWin ? 'double-ctrl' : 'double-cmd'),
+            shortcutMode: data.shortcutMode ?? (isWin ? 'double-ctrl' : 'dual-cmd'),
             windowsHotkeys: data.windowsHotkeys ?? { left: 'lctrl', right: 'rctrl' },
             soundEnabled: data.soundEnabled ?? true,
             animationEnabled: data.animationEnabled ?? true,
@@ -250,9 +250,11 @@ export function AppshotSettingsSection() {
                 h('option', { key: 'custom', value: 'custom' }, '自定义修饰键组合'),
               ]
             : [
-                h('option', { key: 'cmd', value: 'double-cmd' }, '双击 ⌘ Command（或左右 ⌘ 同时按）'),
-                h('option', { key: 'opt', value: 'double-option' }, '双击 ⌥ Option（或左右 ⌥ 同时按）'),
-                h('option', { key: 'ctrl', value: 'double-control' }, '双击 ⌃ Control'),
+                h('option', { key: 'dual-cmd', value: 'dual-cmd' }, '左右 ⌘ Command 同时按（默认）'),
+                h('option', { key: 'double-cmd', value: 'double-cmd' }, '双击 ⌘ Command'),
+                h('option', { key: 'dual-opt', value: 'dual-option' }, '左右 ⌥ Option 同时按'),
+                h('option', { key: 'double-opt', value: 'double-option' }, '双击 ⌥ Option'),
+                h('option', { key: 'double-ctrl', value: 'double-control' }, '双击 ⌃ Control'),
                 h('option', { key: 'combo', value: 'cmd-option' }, '⌘ Command + ⌥ Option 组合键'),
               ]
           ),
@@ -272,9 +274,7 @@ export function AppshotSettingsSection() {
         h('div', null,
           h('div', { style: { fontWeight: 500, color: 'var(--dsw-alias-label-primary, #f4f4f5)', marginBottom: '2px' } }, '快门提示音'),
           h('div', { style: { fontSize: '12px', color: 'var(--dsw-alias-label-secondary, #71717a)' } },
-            isWin
-              ? '截图成功后播放一声提示音'
-              : '截图成功后播放轻快的 macOS 原生快门音',
+            '截图成功后播放清脆的快门提示音',
           ),
         ),
         h('label', { style: { position: 'relative', display: 'inline-block', width: '42px', height: '24px', cursor: 'pointer' } },

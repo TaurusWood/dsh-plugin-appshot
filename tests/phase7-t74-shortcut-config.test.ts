@@ -17,13 +17,20 @@ import {
 describe('T7.4 快捷键与偏好配置及即时生效', () => {
   test('配置模型包含 shortcutMode / soundEnabled / animationEnabled 字段（主流程）', () => {
     const config: AppshotConfig = {
-      shortcutMode: 'double-option',
+      shortcutMode: 'dual-cmd',
       soundEnabled: true,
       animationEnabled: false,
     }
-    assert.equal(config.shortcutMode, 'double-option')
+    assert.equal(config.shortcutMode, 'dual-cmd')
     assert.equal(config.soundEnabled, true)
     assert.equal(config.animationEnabled, false)
+
+    const configDouble: AppshotConfig = {
+      shortcutMode: 'double-cmd',
+      soundEnabled: true,
+      animationEnabled: true,
+    }
+    assert.equal(configDouble.shortcutMode, 'double-cmd')
   })
 
   test('AgentProcess.sendConfig 向 stdin 写入正确格式的 config/update 帧（主流程）', () => {

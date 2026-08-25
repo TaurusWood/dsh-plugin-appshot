@@ -78,7 +78,7 @@ export function applyMacos(ctx: Context) {
           return {
             shortcutMode: (typeof v.shortcutMode === 'string'
               ? v.shortcutMode
-              : 'double-cmd') as AppshotConfig['shortcutMode'],
+              : 'dual-cmd') as AppshotConfig['shortcutMode'],
             soundEnabled: typeof v.soundEnabled === 'boolean' ? v.soundEnabled : true,
             animationEnabled: typeof v.animationEnabled === 'boolean' ? v.animationEnabled : true,
           }
@@ -87,7 +87,7 @@ export function applyMacos(ctx: Context) {
           toJSON: () => ({
             type: 'object',
             properties: {
-              shortcutMode: { type: 'string', default: 'double-cmd' },
+              shortcutMode: { type: 'string', default: 'dual-cmd' },
               soundEnabled: { type: 'boolean', default: true },
               animationEnabled: { type: 'boolean', default: true },
             },
@@ -194,12 +194,12 @@ export function applyMacos(ctx: Context) {
     const getConfig = (): AppshotConfig => {
       if (settings) {
         try {
-          return settings.get?.('appshot' as unknown as string) as AppshotConfig ?? initialConfig ?? { shortcutMode: 'double-cmd', soundEnabled: true, animationEnabled: true }
+          return settings.get?.('appshot' as unknown as string) as AppshotConfig ?? initialConfig ?? { shortcutMode: 'dual-cmd', soundEnabled: true, animationEnabled: true }
         } catch {
           // ignore
         }
       }
-      return initialConfig ?? { shortcutMode: 'double-cmd', soundEnabled: true, animationEnabled: true }
+      return initialConfig ?? { shortcutMode: 'dual-cmd', soundEnabled: true, animationEnabled: true }
     }
 
     webServer.register({
