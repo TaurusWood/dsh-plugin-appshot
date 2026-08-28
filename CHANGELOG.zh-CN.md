@@ -2,6 +2,14 @@
 
 [English](./CHANGELOG.md) | [简体中文](./CHANGELOG.zh-CN.md)
 
+# [0.4.0](https://github.com/TaurusWood/dsh-plugin-appshot/compare/v0.3.3...v0.4.0) (2026-08-25)
+
+
+### 🚀 新特性 (Features)
+
+* **macos:** add fly-in animation and shutter sound with smooth window activation ([aea58e4](https://github.com/TaurusWood/dsh-plugin-appshot/commit/aea58e42901d50021bcb335b4dd06641d86766ec))
+* **shortcuts:** decouple double-tap from dual-modifiers and set dual-command as default ([3426275](https://github.com/TaurusWood/dsh-plugin-appshot/commit/3426275c73976a415a4a7d94288db0cd302ec451))
+
 ## [0.3.3](https://github.com/TaurusWood/dsh-plugin-appshot/compare/v0.3.2...v0.3.3) (2026-08-24)
 
 
