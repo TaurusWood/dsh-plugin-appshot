@@ -4,8 +4,8 @@
 
 [English](README.en.md) · [中文](README.md) · [Changelog](CHANGELOG.md) · [更新日志](CHANGELOG.zh-CN.md)
 
-![macOS](https://img.shields.io/badge/macOS-14%2B-333333?logo=apple&logoColor=white)
-![Windows](https://img.shields.io/badge/Windows-10%2B-0078D4?logo=windows)
+![macOS](https://img.shields.io/badge/macOS-14%2B%20arm64-333333?logo=apple&logoColor=white)
+![Windows](https://img.shields.io/badge/Windows-10%2B%20x64-0078D4?logo=windows)
 ![DSH](https://img.shields.io/badge/DeepSeek%20Harness-0.1.0--rc.6-4f46e5)
 ![npm](https://img.shields.io/npm/v/dsh-plugin-appshot)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -38,7 +38,7 @@ DSH 版的「[Codex Appshots](https://developers.openai.com/codex/appshots)」�
 按下 左⌘+右⌘  →  截取当前前台窗口  →  截图挂入 Composer  →  输入描述并 Send
 ```
 
-目前支持 **macOS 14+**（默认左右 ⌘ Command，可在设置面板切换为双击 ⌘ 等）与 **Windows 10 19041+**（默认双 Ctrl，可在设置面板自定义修饰键组合）。
+目前支持 **macOS 14+（Apple Silicon / arm64）**（默认左右 ⌘ Command，可在设置面板切换为双击 ⌘ 等）与 **Windows 10 19041+（x64）**（默认双 Ctrl，可在设置面板自定义修饰键组合）。
 
 ## 使用
 
@@ -126,7 +126,7 @@ DSH 版的「[Codex Appshots](https://developers.openai.com/codex/appshots)」�
 
 ## 限制
 
-- 支持 **macOS 14+** 与 **Windows 10 19041+**（自包含单文件 Agent，无需安装 .NET 运行时）；WebUI 暂不支持（浏览器沙箱无法获取全局快捷键或跨应用置顶）。
+- 支持 **macOS 14+（Apple Silicon / arm64）** 与 **Windows 10 19041+（x64）**（自包含单文件 Agent，无需安装 .NET 运行时）；WebUI 暂不支持（浏览器沙箱无法获取全局快捷键或跨应用置顶）。
 - 窗口唤起仅对 DSH 桌面端（macOS）生效；`dsh web` 下截图仍可入 Composer，但不唤起/置顶窗口；Windows 按「防自截」设计不唤起 DSH，截图静默进入输入框。
 - 不含区域框选、全屏截图、图片标注、OCR 与历史图库管理（均为后续规划）。
 - 快捷键：macOS 默认左右 Command（同时按，可在设置中切换为双击 Command 等）；Windows 默认双 Ctrl，可在 DSH 设置 → 截图捕获 中自定义修饰键组合，并开关快门音与截图动画（配置跨重启保留）。
