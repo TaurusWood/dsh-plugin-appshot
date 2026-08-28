@@ -1,0 +1,88 @@
+name: Windows Compatibility
+
+on:
+  pull_request:
+    paths:
+      - 'native/windows/**'
+      - '.github/workflows/windows-compat.yml'
+  workflow_dispatch:
+
+jobs:
+  windows-smoke:
+    name: Windows smoke (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - windows-2022
+          - windows-latest
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Run native unit tests
+        run: dotnet test native/windows/AppshotWin.Tests/AppshotWin.Tests.csproj -c Release
+
+      - name: Build native agent
+        run: dotnet publish native/windows/AppshotWin.csproj -c Release -o native/windows/bin/win-x64
+
+      - name: Verify x64 PE architecture
+        shell: pwsh
+        run: |
+          $exe = Resolve-Path 'native/windows/bin/win-x64/appshot-win-x64.exe'
+          $bytes = [System.IO.File]::ReadAllBytes($exe)
+          $peOffset = [BitConverter]::ToInt32($bytes, 0x3C)
+          $machine = [BitConverter]::ToUInt16($bytes, $peOffset + 4)
+          Write-Host ('PE machine=0x{0:X4}' -f $machine)
+          if ($machine -ne 0x8664) {
+            throw ('Expected x64 PE machine 0x8664, got 0x{0:X4}' -f $machine)
+          }
+
+      - name: Smoke test native agent ready handshake
+        shell: pwsh
+        run: |
+          $exe = (Resolve-Path 'native/windows/bin/win-x64/appshot-win-x64.exe').Path
+          $psi = [System.Diagnostics.ProcessStartInfo]::new()
+          $psi.FileName = $exe
+          $psi.UseShellExecute = $false
+          $psi.RedirectStandardOutput = $true
+          $psi.RedirectStandardInput = $true
+          $psi.RedirectStandardError = $true
+          $psi.CreateNoWindow = $true
+
+          $process = [System.Diagnostics.Process]::new()
+          $process.StartInfo = $psi
+          if (-not $process.Start()) {
+            throw 'Failed to start Windows native agent'
+          }
+
+          $readyTask = $process.StandardOutput.ReadLineAsync()
+          if (-not $readyTask.Wait(10000)) {
+            try { $process.Kill() } catch {}
+            throw 'Timed out waiting for native agent ready frame'
+          }
+
+          $ready = $readyTask.Result
+          Write-Host "ready=$ready"
+          if ($ready -notmatch '"type":"ready"' -or $ready -notmatch '"platform":"win32"') {
+            try { $process.Kill() } catch {}
+            throw "Unexpected ready frame: $ready"
+          }
+
+          $process.StandardInput.WriteLine('{"type":"shutdown"}')
+          $process.StandardInput.Flush()
+          if (-not $process.WaitForExit(5000)) {
+            try { $process.Kill() } catch {}
+            throw 'Native agent did not exit after shutdown frame'
+          }
+          if ($process.ExitCode -ne 0) {
+            $stderr = $process.StandardError.ReadToEnd()
+            throw "Native agent exited with code $($process.ExitCode): $stderr"
+          }
