@@ -4,8 +4,8 @@
 
 [English](README.en.md) · [中文](README.md) · [Changelog](CHANGELOG.md) · [更新日志](CHANGELOG.zh-CN.md)
 
-![macOS](https://img.shields.io/badge/macOS-14%2B-333333?logo=apple&logoColor=white)
-![Windows](https://img.shields.io/badge/Windows-10%2B-0078D4?logo=windows)
+![macOS](https://img.shields.io/badge/macOS-14%2B%20arm64-333333?logo=apple&logoColor=white)
+![Windows](https://img.shields.io/badge/Windows-10%2B%20x64-0078D4?logo=windows)
 ![DSH](https://img.shields.io/badge/DeepSeek%20Harness-0.1.0--rc.6-4f46e5)
 ![npm](https://img.shields.io/npm/v/dsh-plugin-appshot)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -38,7 +38,7 @@ A DSH take on "[Codex Appshots](https://developers.openai.com/codex/appshots)": 
 Press Left ⌘ + Right ⌘  →  capture frontmost window  →  image lands in composer  →  describe and Send
 ```
 
-Currently supports **macOS 14+** (Left ⌘ + Right ⌘ by default, remappable in settings) and **Windows 10 19041+** (double Ctrl by default, remappable in the settings panel).
+Currently supports **macOS 14+ (Apple Silicon / arm64)** (Left ⌘ + Right ⌘ by default, remappable in settings) and **Windows 10 19041+ (x64)** (double Ctrl by default, remappable in the settings panel).
 
 ## Usage
 
@@ -126,7 +126,7 @@ If you deny, the capture is aborted with a system notification; re-grant in Syst
 
 ## Limitations
 
-- Supports **macOS 14+** and **Windows 10 19041+** (self-contained single-file agent — no .NET runtime install needed); WebUI is not supported (a browser sandbox can't access global hotkeys or cross-app activation).
+- Supports **macOS 14+ (Apple Silicon / arm64)** and **Windows 10 19041+ (x64)** (self-contained single-file agent — no .NET runtime install needed); WebUI is not supported (a browser sandbox can't access global hotkeys or cross-app activation).
 - Window activation applies to the DSH desktop app (macOS) only; under `dsh web` screenshots still land in the composer, but the window is not activated/brought to front; Windows follows the anti-self-capture design and never activates DSH — screenshots silently land in the composer input.
 - No region selection, full-screen capture, image annotation, OCR, or screenshot history (all on the roadmap).
 - Hotkeys: Left ⌘ + Right ⌘ (Dual Command) by default on macOS; double-Ctrl by default on Windows, remappable in DSH Settings → Screenshot Capture, which also toggles the shutter sound and capture animation (settings persist across restarts).
