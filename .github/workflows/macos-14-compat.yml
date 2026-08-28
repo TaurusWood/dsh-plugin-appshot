@@ -1,4 +1,4 @@
-name: macOS 14 Compatibility
+name: macOS Compatibility
 
 on:
   pull_request:
@@ -8,8 +8,15 @@ on:
   workflow_dispatch:
 
 jobs:
-  macos-14-smoke:
-    runs-on: macos-14
+  macos-smoke:
+    name: macOS smoke (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - macos-14
+          - macos-latest
+    runs-on: ${{ matrix.os }}
 
     steps:
       - name: Checkout repository
@@ -17,6 +24,16 @@ jobs:
 
       - name: Build native agent
         run: ./native/macos/scripts/build-app.sh
+
+      - name: Verify arm64 architecture
+        run: |
+          BINARY="native/macos/.build/Appshot Agent.app/Contents/MacOS/appshot-macos"
+          ARCHS="$(lipo -archs "$BINARY")"
+          echo "archs=$ARCHS"
+          if [[ "$ARCHS" != "arm64" ]]; then
+            echo "Expected arm64-only macOS binary, got: $ARCHS" >&2
+            exit 1
+          fi
 
       - name: Verify deployment target
         run: |
