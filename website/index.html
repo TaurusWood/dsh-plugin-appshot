@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Appshot — Window context capture for DeepSeek Harness</title>
+    <meta
+      name="description"
+      content="Appshot is a global-hotkey plugin for DeepSeek Harness: one press captures the window you are working in and mounts it into the composer as agent context. macOS 14+ and Windows 10 19041+, MIT open source."
+    />
+    <meta name="theme-color" content="#0b0d11" />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+
+    <!-- Open Graph / Twitter. og:image is intentionally relative so the card
+         resolves on any static host; swap for an absolute URL once the final
+         deployment domain is fixed. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Appshot" />
+    <meta property="og:title" content="Appshot — Window context capture for DeepSeek Harness" />
+    <meta
+      property="og:description"
+      content="One global hotkey turns the window you are working in into agent context for DeepSeek Harness. No saving, no switching, no uploading."
+    />
+    <meta property="og:image" content="og.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Appshot — Window context capture for DeepSeek Harness" />
+    <meta
+      name="twitter:description"
+      content="One global hotkey turns the window you are working in into agent context for DeepSeek Harness."
+    />
+    <meta name="twitter:image" content="og.png" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <noscript>Appshot — a DeepSeek Harness plugin. Enable JavaScript to view this site, or read the README on GitHub: https://github.com/TaurusWood/dsh-plugin-appshot</noscript>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

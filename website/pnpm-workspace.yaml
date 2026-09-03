@@ -1,0 +1,6 @@
+# Isolated workspace root: keeps the website's dependency install fully
+# separated from the plugin package at the repository root.
+packages:
+  - .
+allowBuilds:
+  esbuild: true
