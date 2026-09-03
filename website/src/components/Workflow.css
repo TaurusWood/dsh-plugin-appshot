@@ -1,0 +1,79 @@
+.workflow-paths {
+  display: grid;
+  gap: 36px;
+}
+
+.path-name {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-low);
+  margin-bottom: 16px;
+}
+
+.path-name-new {
+  color: var(--accent-strong);
+}
+
+.path-steps {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 8px;
+}
+
+.path-step {
+  display: inline-flex;
+  align-items: center;
+  height: 42px;
+  padding-inline: 18px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--bg-inset);
+  font-size: 14.5px;
+  color: var(--text-mid);
+}
+
+.path-arrow {
+  display: flex;
+  color: var(--text-low);
+}
+
+.path-new .path-step {
+  border-color: var(--accent-line);
+  background: var(--accent-dim);
+  color: var(--text-hi);
+  font-weight: 550;
+}
+
+.path-new .path-arrow {
+  color: var(--accent);
+}
+
+/* strike a line through the old loop without being loud about it */
+.path-old .path-step {
+  position: relative;
+}
+
+.path-old .path-step::after {
+  content: '';
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: 50%;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.workflow-note {
+  margin-top: 40px;
+  padding-left: 18px;
+  border-left: 2px solid var(--accent-line);
+  color: var(--text-mid);
+  font-size: 15.5px;
+  max-width: 620px;
+  text-wrap: pretty;
+}

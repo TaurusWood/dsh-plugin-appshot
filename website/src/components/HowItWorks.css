@@ -1,0 +1,92 @@
+.how-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+  gap: clamp(40px, 5vw, 72px);
+  align-items: center;
+}
+
+.how-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.how-step {
+  position: relative;
+  padding: 22px 0 22px 30px;
+}
+
+/* vertical spine connecting the three steps */
+.how-step::before {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--line);
+}
+
+.how-step:first-child::before {
+  top: 30px;
+}
+
+.how-step:last-child::before {
+  bottom: auto;
+  height: 30px;
+}
+
+.how-num {
+  position: absolute;
+  left: 0;
+  top: 26px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 1.5px solid var(--accent);
+  background: var(--bg);
+  font-size: 0;
+}
+
+.how-step-title {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.how-step-body {
+  margin-top: 8px;
+  color: var(--text-mid);
+  font-size: 15px;
+  max-width: 440px;
+  text-wrap: pretty;
+}
+
+.how-figure {
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+}
+
+.how-figure img {
+  width: 100%;
+}
+
+.how-caption {
+  margin-top: 14px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-low);
+  max-width: 480px;
+}
+
+@media (max-width: 980px) {
+  .how-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .how-visual {
+    order: -1;
+  }
+}
