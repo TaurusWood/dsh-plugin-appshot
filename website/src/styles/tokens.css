@@ -1,0 +1,47 @@
+:root {
+  color-scheme: dark;
+
+  /* surfaces */
+  --bg: #0b0d11;
+  --bg-elev: #10131a;
+  --bg-inset: #0d1015;
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.16);
+
+  /* text */
+  --text-hi: #e8eaf0;
+  --text-mid: #9aa1ad;
+  --text-low: #616774;
+
+  /* accent — one cold electric blue, used sparingly */
+  --accent: #5b8cff;
+  --accent-strong: #82a6ff;
+  --accent-dim: rgba(91, 140, 255, 0.13);
+  --accent-line: rgba(91, 140, 255, 0.5);
+  --ok: #57d99a;
+  --no: #e5735f;
+
+  /* type */
+  --font-sans:
+    'Inter Variable', -apple-system, BlinkMacSystemFont, 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC', 'Segoe UI', sans-serif;
+  --font-mono:
+    'JetBrains Mono Variable', ui-monospace, 'SF Mono', 'Cascadia Code', Menlo,
+    Consolas, monospace;
+
+  /* geometry */
+  --container: 1128px;
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 18px;
+  --header-h: 64px;
+
+  /* elevation */
+  --shadow-card:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 10px 30px rgba(0, 0, 0, 0.35);
+  --shadow-pop: 0 24px 60px rgba(0, 0, 0, 0.55);
+
+  /* motion */
+  --ease-out: cubic-bezier(0.22, 0.7, 0.3, 1);
+  --dur: 0.45s;
+}
