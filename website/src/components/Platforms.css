@@ -1,0 +1,141 @@
+.platform-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  align-items: stretch;
+}
+
+.platform-panel {
+  display: flex;
+  flex-direction: column;
+  padding: 26px 26px 22px;
+}
+
+.platform-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.platform-name {
+  font-size: 18px;
+  font-weight: 620;
+  letter-spacing: -0.01em;
+  margin-right: auto;
+}
+
+.pk-key {
+  min-width: 32px;
+  height: 32px;
+  font-size: 13.5px;
+}
+
+.platform-keys-label {
+  flex-basis: 100%;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--text-low);
+}
+
+/* macOS: the real before/after pair */
+
+.platform-media {
+  display: grid;
+  gap: 14px;
+  padding-block: 18px 4px;
+}
+
+.pm-item img {
+  width: 100%;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+}
+
+.pm-item figcaption {
+  margin-top: 7px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-low);
+}
+
+/* Windows: a quiet "silent delivery" strip instead of screenshots we don't have */
+
+.platform-silent {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-block: 34px 6px;
+}
+
+.ps-line {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--accent-line), transparent);
+}
+
+.ps-badge {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent-strong);
+}
+
+.platform-points {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+
+.platform-points li {
+  position: relative;
+  padding-left: 18px;
+  font-size: 14.5px;
+  color: var(--text-mid);
+  text-wrap: pretty;
+}
+
+.platform-points li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 9px;
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  border: 1.5px solid var(--accent);
+}
+
+.platform-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 22px;
+}
+
+.platform-tags span {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  color: var(--text-low);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 11px;
+}
+
+@media (max-width: 980px) {
+  .platform-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
