@@ -2,6 +2,8 @@
 
 > A macOS / Windows global-hotkey "one-shot screenshot of the **current window**" that drops the image into the DeepSeek Harness (DSH) composer as context — hand your current working window to the agent with zero friction.
 
+**Project site (GitHub Pages):** [https://appshot.twoodbyte.top/](https://appshot.twoodbyte.top/)
+
 [English](README.en.md) · [中文](README.md) · [Changelog](CHANGELOG.md) · [更新日志](CHANGELOG.zh-CN.md)
 
 ![macOS](https://img.shields.io/badge/macOS-14%2B%20arm64-333333?logo=apple&logoColor=white)
