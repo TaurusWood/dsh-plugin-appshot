@@ -8,19 +8,23 @@
 
 ![macOS](https://img.shields.io/badge/macOS-14%2B%20arm64-333333?logo=apple&logoColor=white)
 ![Windows](https://img.shields.io/badge/Windows-10%2B%20x64-0078D4?logo=windows)
-![DSH](https://img.shields.io/badge/DeepSeek%20Harness-0.1.0--rc.6-4f46e5)
+![DSH](https://img.shields.io/badge/DeepSeek%20Harness-0.1.7-4f46e5)
 ![npm](https://img.shields.io/npm/v/dsh-plugin-appshot)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-## 安装（一条命令）
+## 安装
 
-```sh
-dsh plugin --profile web add dsh-plugin-appshot
-```
+在 DeepSeek Harness 0.1.7 开发预览版 Desktop 中：
 
-- npm 包为**预构建产物**：宿主插件 + 客户端模块 + 双平台 Native Agent（macOS `.app` 与 Windows 自包含单文件 `.exe`）已全部打包，**无需本地编译、无需构建授权**；
-- 安装后**重启 dsh**，启动日志出现 `[dsh-plugin-appshot] plugin applied successfully`、`native agent ready` 即加载成功；
-- macOS 首次触发截图时会弹出授权引导，需授予**屏幕录制**与**辅助功能**权限（见[权限](#权限)）；Windows 无需额外授权。
+1. 打开「插件」→「添加插件」
+2. 输入 `dsh-plugin-appshot`
+3. 安装后重启
+
+![在添加插件对话框中输入 dsh-plugin-appshot](website/src/assets/dsh-origin-desktop-preview.png)
+
+npm 包为预构建产物，无需本地编译。重启后日志出现 `plugin applied successfully` 和 `native agent ready` 即加载成功。macOS 首次截图需授予**屏幕录制**与**辅助功能**（见[权限](#权限)）；Windows 无需额外授权。
+
+命令行：`dsh plugin add dsh-plugin-appshot`
 
 > 从源码安装（开发/贡献者）：在插件目录 `pnpm install && pnpm build && pnpm build:native`，然后在插件**父目录**执行 `dsh plugin --profile <name> add ./dsh-plugin-appshot`（`dsh plugin add` 的相对路径锚定调用目录）。
 

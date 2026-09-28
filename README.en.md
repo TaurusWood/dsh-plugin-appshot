@@ -8,19 +8,23 @@
 
 ![macOS](https://img.shields.io/badge/macOS-14%2B%20arm64-333333?logo=apple&logoColor=white)
 ![Windows](https://img.shields.io/badge/Windows-10%2B%20x64-0078D4?logo=windows)
-![DSH](https://img.shields.io/badge/DeepSeek%20Harness-0.1.0--rc.6-4f46e5)
+![DSH](https://img.shields.io/badge/DeepSeek%20Harness-0.1.7-4f46e5)
 ![npm](https://img.shields.io/npm/v/dsh-plugin-appshot)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-## Install (one command)
+## Install
 
-```sh
-dsh plugin --profile web add dsh-plugin-appshot
-```
+In the DeepSeek Harness 0.1.7 desktop preview:
 
-- The npm package ships **prebuilt artifacts** — host plugin + client module + Native Agents for both platforms (the macOS `.app` and a self-contained single-file Windows `.exe`) bundled together; **no local compilation, no build approval** needed.
-- **Restart dsh** after installing; you're ready when the startup log shows `[dsh-plugin-appshot] plugin applied successfully` and `native agent ready`.
-- On first trigger, macOS will ask for two permissions: **Screen Recording** and **Accessibility** (see [Permissions](#permissions)); Windows needs no extra permission grants.
+1. Open Plugins → Add plugin
+2. Enter `dsh-plugin-appshot`
+3. Install, then restart
+
+![Add plugin dialog with dsh-plugin-appshot entered](website/src/assets/dsh-origin-desktop-preview.png)
+
+The npm package is prebuilt — no local compilation. You are ready when the log shows `plugin applied successfully` and `native agent ready`. On first capture, macOS asks for **Screen Recording** and **Accessibility** (see [Permissions](#permissions)); Windows needs no extra grants.
+
+Command line: `dsh plugin add dsh-plugin-appshot`
 
 > Installing from source (developers/contributors): run `pnpm install && pnpm build && pnpm build:native` inside the plugin directory, then run `dsh plugin --profile <name> add ./dsh-plugin-appshot` from its **parent** directory (`dsh plugin add` resolves relative paths against the invoking directory).
 

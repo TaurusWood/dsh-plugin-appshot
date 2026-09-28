@@ -3,6 +3,7 @@ import { useLang } from '../i18n/lang'
 import { Section } from './Section'
 import { Reveal } from './Reveal'
 import { CheckIcon, CopyIcon } from './icons'
+import preview from '../assets/dsh-origin-desktop-preview.png'
 import './Install.css'
 
 async function copyText(text: string): Promise<boolean> {
@@ -36,7 +37,7 @@ export function Install() {
   useEffect(() => () => clearTimeout(resetTimer.current), [])
 
   const onCopy = async () => {
-    if (await copyText(t.install.command)) {
+    if (await copyText(t.install.packageName)) {
       setCopied(true)
       clearTimeout(resetTimer.current)
       resetTimer.current = window.setTimeout(() => setCopied(false), 1800)
@@ -47,39 +48,29 @@ export function Install() {
     <Section id="install" index="07" eyebrow={t.install.eyebrow} title={t.install.title} sub={t.install.sub}>
       <div className="install-col">
         <Reveal>
-          <div className="term card">
-            <div className="term-bar">
-              <span className="term-dots" aria-hidden="true">
-                <i />
-                <i />
-                <i />
-              </span>
-              <span className="term-title">{t.install.terminalTitle}</span>
-            </div>
-            <div className="term-row">
-              <code className="term-cmd">
-                <span className="term-prompt" aria-hidden="true">
-                  $
-                </span>
-                {t.install.command}
-              </code>
-              <button type="button" className={copied ? 'term-copy copied' : 'term-copy'} onClick={onCopy}>
-                {copied ? <CheckIcon /> : <CopyIcon />}
-                <span>{copied ? t.install.copied : t.install.copy}</span>
-              </button>
-            </div>
-          </div>
-          <p className="install-note" aria-live="polite">
-            {t.install.commandNote}
-          </p>
-        </Reveal>
-
-        <Reveal delay={90}>
           <ol className="install-steps">
             {t.install.steps.map((step) => (
               <li key={step}>{step}</li>
             ))}
           </ol>
+          <div className="install-name card">
+            <code>{t.install.packageName}</code>
+            <button type="button" className={copied ? 'term-copy copied' : 'term-copy'} onClick={onCopy}>
+              {copied ? <CheckIcon /> : <CopyIcon />}
+              <span>{copied ? t.install.copied : t.install.copy}</span>
+            </button>
+          </div>
+        </Reveal>
+
+        <Reveal delay={90}>
+          <figure className="install-preview card">
+            <img src={preview} alt={t.install.previewAlt} />
+          </figure>
+          <p className="install-note">{t.install.note}</p>
+          <p className="install-cli">
+            <span>{t.install.cliLabel}</span>
+            <code>{t.install.cli}</code>
+          </p>
         </Reveal>
 
         <Reveal delay={140}>

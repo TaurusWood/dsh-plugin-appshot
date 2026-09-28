@@ -195,17 +195,16 @@ const en = {
 
   install: {
     eyebrow: 'Install',
-    title: 'One command, prebuilt for both platforms',
-    sub: 'The npm package ships the host plugin, the client module and both native agents prebuilt — no local compilation, no build approval.',
-    terminalTitle: 'Terminal',
-    command: 'dsh plugin --profile web add dsh-plugin-appshot',
-    commandNote: 'Replace “web” with the name of your DSH profile.',
-    copy: 'Copy command',
+    title: 'Add it in Desktop',
+    sub: 'For the DeepSeek Harness 0.1.7 desktop preview. The npm package is prebuilt for both platforms — no local compilation.',
+    steps: ['Open Plugins → Add plugin.', 'Enter the package name and install.', 'Restart Desktop.'],
+    packageName: 'dsh-plugin-appshot',
+    copy: 'Copy name',
     copied: 'Copied',
-    steps: [
-      'Restart dsh — you are ready when the log shows “plugin applied successfully” and “native agent ready”.',
-      'macOS asks for Screen Recording and Accessibility on first capture; Windows needs no extra grants.',
-    ],
+    previewAlt: 'Add plugin dialog with dsh-plugin-appshot entered',
+    note: 'You are ready when the log shows plugin applied successfully and native agent ready. macOS asks for Screen Recording and Accessibility on first capture; Windows needs no extra grants.',
+    cliLabel: 'Command line',
+    cli: 'dsh plugin add dsh-plugin-appshot',
     badges: {
       mac: 'macOS 14+',
       win: 'Windows 10 19041+',
@@ -432,17 +431,16 @@ const zh: Dict = {
 
   install: {
     eyebrow: '安装',
-    title: '一条命令，双平台预构建',
-    sub: 'npm 包内含宿主插件、客户端模块与双平台 Native Agent 预构建产物——无需本地编译，无需构建授权。',
-    terminalTitle: '终端',
-    command: 'dsh plugin --profile web add dsh-plugin-appshot',
-    commandNote: '把「web」换成你的 DSH profile 名称。',
-    copy: '复制命令',
+    title: '在 Desktop 里添加插件',
+    sub: '适用于 DeepSeek Harness 0.1.7 开发预览版。npm 包已含双平台预构建产物，无需本地编译。',
+    steps: ['打开「插件」→「添加插件」。', '输入包名并安装。', '重启 Desktop。'],
+    packageName: 'dsh-plugin-appshot',
+    copy: '复制包名',
     copied: '已复制',
-    steps: [
-      '重启 dsh——日志出现「plugin applied successfully」与「native agent ready」即加载成功。',
-      'macOS 首次截图会引导授予屏幕录制与辅助功能权限；Windows 无需额外授权。',
-    ],
+    previewAlt: '在添加插件对话框中输入 dsh-plugin-appshot',
+    note: '日志出现 plugin applied successfully 与 native agent ready 即加载成功。macOS 首次截图需授予屏幕录制与辅助功能；Windows 无需额外授权。',
+    cliLabel: '命令行',
+    cli: 'dsh plugin add dsh-plugin-appshot',
     badges: {
       mac: 'macOS 14+',
       win: 'Windows 10 19041+',
