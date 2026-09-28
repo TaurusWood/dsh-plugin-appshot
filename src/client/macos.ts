@@ -7,7 +7,7 @@
 
 import type { AppshotReadyFrame } from '../macos/sse.ts'
 import type { ImageAttachmentRef } from '../shared/types.ts'
-import type { AppshotClientCtx } from './context.ts'
+import { mainSessionId, type AppshotClientCtx } from './context.ts'
 
 export interface ComposerService {
   appendDraft(sessionId: string, ref: ImageAttachmentRef): void
@@ -78,24 +78,27 @@ export function applyMacosClient(ctx: AppshotClientCtx) {
   }
 
   const es = new EventSource('/plugins/appshot/events')
+  es.addEventListener('open', () => {
+    console.log('[dsh-plugin-appshot:client] SSE open', es.url)
+  })
 
   const handleFrame = async (frame: unknown) => {
     if (!isReadyFrame(frame)) return
 
-    const current = ctx.sessions.list.getSnapshot().current
-    if (!current) {
-      console.warn('[dsh-plugin-appshot:client] no active session; attachment saved on host, not mounted')
+    const sessionId = mainSessionId(ctx.sessions.list.getSnapshot())
+    const scope = sessionId === undefined ? undefined : ctx.sessions.scope(sessionId)
+    console.log('[dsh-plugin-appshot:client] ready frame', {
+      sessionId: sessionId ?? null,
+      dataBase64Chars: frame.dataBase64?.length ?? 0,
+    })
+    if (sessionId === undefined || scope === undefined) {
+      console.warn('[dsh-plugin-appshot:client] no main session; attachment saved on host, not mounted')
       return
     }
 
-    const binding = ctx.sessions.binding(current)
-    if (!binding) {
-      console.warn('[dsh-plugin-appshot:client] active session binding unavailable:', current)
-      return
-    }
-
+    const input = ctx.conversation.input.for(scope)
     if (!frame.dataBase64) {
-      ctx.conversation.input.for(binding.ctx).notify('error', '截图帧缺少图像字节，无法挂载草稿')
+      input.notify('error', '截图帧缺少图像字节，无法挂载草稿')
       return
     }
 
@@ -104,21 +107,17 @@ export function applyMacosClient(ctx: AppshotClientCtx) {
       const file = new File([bytes], frame.attachmentRef.name ?? '窗口截图.png', {
         type: frame.attachmentRef.mediaType,
       })
-      const [draft] = ctx.conversation.createDraftImages([file])
-      const accepted = ctx.conversation.input.for(binding.ctx).addImages([draft.id])
+      const [draft] = ctx.conversation.createDrafts(sessionId, [file])
+      if (draft === undefined) return
+      const accepted = input.addAttachments([draft.id])
       if (!accepted) {
-        ctx.conversation.input.for(binding.ctx).notify('info', 'Composer 繁忙，截图已保存为附件，未挂入草稿')
+        input.notify('info', 'Composer 繁忙，截图已保存为附件，未挂入草稿')
         return
       }
       console.log('[dsh-plugin-appshot:client] draft image mounted:', draft.id)
-
-      if (typeof window !== 'undefined') {
-        window.focus()
-      }
-      const input = document.querySelector('textarea, [contenteditable="true"]') as HTMLElement | null
-      input?.focus()
+      input.focus()
     } catch (err) {
-      ctx.conversation.input.for(binding.ctx).notify('error', `截图挂载失败: ${String(err)}`)
+      input.notify('error', `截图挂载失败: ${String(err)}`)
     }
   }
 
