@@ -1,77 +1,32 @@
 .install-col {
-  max-width: 780px;
+  max-width: 920px;
 }
 
-.term {
-  overflow: hidden;
-  border-radius: var(--radius);
-}
-
-.term-bar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 11px 16px;
-  border-bottom: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.02);
-}
-
-.term-dots {
-  display: flex;
-  gap: 6px;
-}
-
-.term-dots i {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-}
-
-.term-dots i:nth-child(1) {
-  background: #ff5f57;
-}
-
-.term-dots i:nth-child(2) {
-  background: #febc2e;
-}
-
-.term-dots i:nth-child(3) {
-  background: #28c840;
-}
-
-.term-title {
-  font-family: var(--font-mono);
-  font-size: 11.5px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--text-low);
-}
-
-.term-row {
+.install-name {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 16px 16px 16px 18px;
+  margin-top: 18px;
+  padding: 14px 16px;
 }
 
-.term-cmd {
+.install-name code {
   flex: 1;
   min-width: 0;
   font-family: var(--font-mono);
-  font-size: 14px;
+  font-size: 15px;
   color: var(--text-hi);
-  white-space: nowrap;
-  overflow-x: auto;
-  scrollbar-width: none;
 }
 
-.term-cmd::-webkit-scrollbar {
-  display: none;
+.install-preview {
+  margin: 0;
+  overflow: hidden;
 }
 
-.term-prompt {
-  color: var(--accent);
-  margin-right: 10px;
+.install-preview img {
+  display: block;
+  width: 100%;
+  height: auto;
 }
 
 .term-copy {
@@ -100,15 +55,30 @@
 }
 
 .install-note {
-  margin-top: 12px;
-  font-family: var(--font-mono);
-  font-size: 12px;
+  margin-top: 14px;
+  font-size: 14.5px;
+  color: var(--text-mid);
+}
+
+.install-cli {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 10px;
+  font-size: 14px;
   color: var(--text-low);
+}
+
+.install-cli code {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text-hi);
 }
 
 .install-steps {
   list-style: none;
-  margin: 34px 0 0;
+  margin: 0;
   padding: 0;
   counter-reset: install-step;
   display: flex;
