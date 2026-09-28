@@ -82,6 +82,11 @@ export function createAppshotSSEHub(ctx: WebServerContext): AppshotSSEHub {
   return {
     broadcast(frame: AppshotReadyFrame) {
       const payload = `event: appshot/ready\ndata: ${JSON.stringify(frame)}\n\n`
+      console.log('[dsh-plugin-appshot] sse broadcast', {
+        subscribers: clients.size,
+        attachmentId: frame.attachmentRef.attachmentId,
+        dataBase64Chars: frame.dataBase64?.length ?? 0,
+      })
       for (const client of clients) {
         try {
           client.write(payload)

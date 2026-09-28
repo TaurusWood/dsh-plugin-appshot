@@ -1,17 +1,17 @@
 /**
  * src/client/w0.ts — W0 真机验证：DSH Draft API 全链路（仅验证模式激活）。
  *
- * 验证 DSH Draft API 行为（api-grounded-review.md §3.4 已核实形态）：
- * 1. sessions.list.getSnapshot().current / sessions.binding(sessionId)；
- * 2. conversation.createDraftImages(files) → 固定 draftId；
- * 3. input.for(binding.ctx).addImages([draftId]) → true/false；
- * 4. input.snapshot.imageIds 包含 draftId；
- * 5. conversation.draftImages([draftId]) 可解析；
- * 6. input.removeImage(draftId) + conversation.releaseDraftImage(draftId) 清理。
+ * 验证 DSH 0.1.7 Draft API：
+ * 1. mainSessionId(list) / sessions.scope(sessionId)；
+ * 2. conversation.createDrafts(sessionId, files) → 固定 draftId；
+ * 3. input.for(scope).addAttachments([draftId]) → true/false；
+ * 4. input.snapshot.attachmentIds 包含 draftId；
+ * 5. conversation.resolveDraftAttachments([draftId]) 可解析；
+ * 6. input.removeAttachment(draftId) + conversation.releaseDraftAttachment(draftId) 清理。
  * 结果写入 sessionStorage 并经 POST 回报到 Host 路由 /plugins/appshot/w0-report。
  */
 
-import type { AppshotClientCtx } from './context.ts'
+import { mainSessionId, type AppshotClientCtx } from './context.ts'
 
 export interface W0VerifyResult {
   name: string
@@ -26,35 +26,32 @@ export async function runW0DraftVerify(ctx: AppshotClientCtx): Promise<W0VerifyR
   try {
     // 1. 定位当前活跃 Session（Renderer reload 后 UI 恢复选中需要时间，轮询等待）
     let snapshot = ctx.sessions.list.getSnapshot()
-    let sessionId: string | undefined = snapshot.current
+    let sessionId = mainSessionId(snapshot)
     const pollStart = Date.now()
-    while (!sessionId && Date.now() - pollStart < 12000) {
+    while (sessionId === undefined && Date.now() - pollStart < 12000) {
       await new Promise((r) => setTimeout(r, 500))
       snapshot = ctx.sessions.list.getSnapshot()
-      sessionId = snapshot.current
+      sessionId = mainSessionId(snapshot)
     }
-    record('sessions.list.getSnapshot().current', typeof sessionId === 'string', {
-      current: sessionId,
+    record('mainSessionId(list)', typeof sessionId === 'string', {
+      sessionId,
       idsCount: Array.isArray(snapshot.ids) ? snapshot.ids.length : undefined,
       idsSample: Array.isArray(snapshot.ids) ? snapshot.ids.slice(0, 5) : undefined,
     })
-    if (!sessionId) {
+    if (sessionId === undefined) {
       record('W0 前置：存在活跃 Session', false, { hint: '请在 DSH 中打开一个会话后重试', idsCount: Array.isArray(snapshot.ids) ? snapshot.ids.length : undefined })
       await reportW0Results(results)
       return results
     }
 
-    // 2. sessions.binding 解析目标 Session
-    const binding = ctx.sessions.binding(sessionId)
-    record('sessions.binding(sessionId)', !!binding, { sessionId })
-    if (!binding) {
-      record('binding.ctx 可解析', false, {})
+    const scope = ctx.sessions.scope(sessionId)
+    record('sessions.scope(sessionId)', scope !== undefined, { sessionId })
+    if (scope === undefined) {
       await reportW0Results(results)
       return results
     }
-    record('binding.ctx 可解析', true, { hasCtx: !!binding.ctx })
 
-    // 3. createDraftImages：创建 1x1 像素 PNG
+    // 3. createDrafts：创建 1x1 像素 PNG
     const pngBytes = Uint8Array.from([
       0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
       0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
@@ -67,73 +64,68 @@ export async function runW0DraftVerify(ctx: AppshotClientCtx): Promise<W0VerifyR
       0x42, 0x60, 0x82,
     ])
     const file = new File([pngBytes], 'w0-verify.png', { type: 'image/png' })
-    let drafts: readonly { id: string; file: File }[]
+    let drafts: readonly { id: string }[]
     try {
-      drafts = ctx.conversation.createDraftImages([file])
-      record('createDraftImages(files)', drafts.length === 1 && typeof drafts[0].id === 'string', {
+      drafts = ctx.conversation.createDrafts(sessionId, [file])
+      record('createDrafts(sessionId, files)', drafts.length === 1 && typeof drafts[0]?.id === 'string', {
         count: drafts.length,
         id: drafts[0]?.id,
       })
     } catch (err) {
-      record('createDraftImages(files)', false, { error: String(err) })
+      record('createDrafts(sessionId, files)', false, { error: String(err) })
       await reportW0Results(results)
       return results
     }
-    if (drafts.length !== 1) {
+    if (drafts.length !== 1 || drafts[0] === undefined) {
       await reportW0Results(results)
       return results
     }
     const draftId = drafts[0].id
 
-    // 4. addImages 挂入 Composer
     let accepted: boolean
     try {
-      const input = ctx.conversation.input.for(binding.ctx)
-      accepted = input.addImages([draftId])
-      record('input.for(binding.ctx).addImages([draftId])', typeof accepted === 'boolean', { accepted })
+      const input = ctx.conversation.input.for(scope)
+      accepted = input.addAttachments([draftId])
+      record('input.for(scope).addAttachments([draftId])', typeof accepted === 'boolean', { accepted })
     } catch (err) {
-      record('input.for(binding.ctx).addImages([draftId])', false, { error: String(err) })
+      record('input.for(scope).addAttachments([draftId])', false, { error: String(err) })
       await reportW0Results(results)
       return results
     }
 
-    // 5. snapshot.imageIds 活性验证
-    let imageIds: readonly string[]
+    let attachmentIds: readonly string[]
     try {
-      const shell = ctx.conversation.input.for(binding.ctx) as unknown as { snapshot: { imageIds: readonly string[] } }
-      imageIds = shell.snapshot.imageIds
-      record('input.snapshot.imageIds 包含 draftId', imageIds.includes(draftId), { imageIds })
+      attachmentIds = ctx.conversation.input.for(scope).snapshot.attachmentIds
+      record('input.snapshot.attachmentIds 包含 draftId', attachmentIds.includes(draftId), { attachmentIds })
     } catch (err) {
-      record('input.snapshot.imageIds 包含 draftId', false, { error: String(err) })
+      record('input.snapshot.attachmentIds 包含 draftId', false, { error: String(err) })
       await reportW0Results(results)
       return results
     }
 
-    // 6. draftImages registry 活性验证
     let draftAlive = false
     try {
-      const resolved = ctx.conversation.draftImages([draftId])
+      const resolved = ctx.conversation.resolveDraftAttachments([draftId])
       draftAlive = resolved.length === 1
-      record('conversation.draftImages([draftId])', draftAlive, { resolved: resolved.length })
+      record('conversation.resolveDraftAttachments([draftId])', draftAlive, { resolved: resolved.length })
     } catch (err) {
-      record('conversation.draftImages([draftId])', false, { error: String(err) })
+      record('conversation.resolveDraftAttachments([draftId])', false, { error: String(err) })
     }
 
-    // 7. 取消清理：removeImage + releaseDraftImage
     try {
-      const input = ctx.conversation.input.for(binding.ctx) as unknown as { removeImage(id: string): void }
-      input.removeImage(draftId)
-      const afterRemove = (ctx.conversation.input.for(binding.ctx) as unknown as { snapshot: { imageIds: readonly string[] } }).snapshot.imageIds
-      record('input.removeImage(draftId)', !afterRemove.includes(draftId), { afterRemove })
+      const input = ctx.conversation.input.for(scope)
+      const removed = input.removeAttachment(draftId)
+      const afterRemove = input.snapshot.attachmentIds
+      record('input.removeAttachment(draftId)', removed && !afterRemove.includes(draftId), { afterRemove })
     } catch (err) {
-      record('input.removeImage(draftId)', false, { error: String(err) })
+      record('input.removeAttachment(draftId)', false, { error: String(err) })
     }
     try {
-      ctx.conversation.releaseDraftImage(draftId)
-      const afterRelease = ctx.conversation.draftImages([draftId])
-      record('conversation.releaseDraftImage(draftId)', afterRelease.length === 0, { afterRelease: afterRelease.length })
+      ctx.conversation.releaseDraftAttachment(draftId)
+      const afterRelease = ctx.conversation.resolveDraftAttachments([draftId])
+      record('conversation.releaseDraftAttachment(draftId)', afterRelease.length === 0, { afterRelease: afterRelease.length })
     } catch (err) {
-      record('conversation.releaseDraftImage(draftId)', false, { error: String(err) })
+      record('conversation.releaseDraftAttachment(draftId)', false, { error: String(err) })
     }
   } catch (err) {
     record('W0 验证整体执行', false, { error: String(err) })

@@ -8,7 +8,7 @@
  * - 无 Session / SESSION_MISMATCH 时挂 pendingClaims，等待用户显式认领。
  */
 
-import type { AppshotClientCtx } from './context.ts'
+import { mainSessionId, type AppshotClientCtx } from './context.ts'
 
 function appshotUrl(path: string): URL {
   const origin = globalThis.location?.origin
@@ -113,7 +113,7 @@ export function applyWindowsClient(ctx: AppshotClientCtx) {
   > => {
     if (aborted) return null
     const snapshot = ctx.sessions.list.getSnapshot()
-    const sessionId = snapshot.current
+    const sessionId = mainSessionId(snapshot)
     if (sessionId !== currentSessionId || claimPendingCaptureId) {
       currentSessionId = sessionId
       if (sessionId) {
@@ -147,7 +147,7 @@ export function applyWindowsClient(ctx: AppshotClientCtx) {
   const tryClaimPending = async () => {
     if (aborted || pendingClaims.size === 0) return
     const snapshot = ctx.sessions.list.getSnapshot()
-    const sessionId = snapshot.current
+    const sessionId = mainSessionId(snapshot)
     if (!sessionId) return
     for (const [captureId] of pendingClaims) {
       const claimResult = await syncSession(captureId)
@@ -210,14 +210,14 @@ export function applyWindowsClient(ctx: AppshotClientCtx) {
     const delay = count <= 5 ? 500 : 3000
     retryTimer = setTimeout(async () => {
       if (aborted || !pendingRetry || pendingRetry.captureId !== captureId) return
-      const binding = ctx.sessions.binding(targetSessionId)
-      if (!binding) {
+      const scope = ctx.sessions.scope(targetSessionId)
+      if (scope === undefined) {
         await sendDeliveryResult(captureId, targetSessionId, 'SESSION_MISMATCH')
         return
       }
       try {
-        const input = ctx.conversation.input.for(binding.ctx)
-        const accepted = input.addImages([draftId])
+        const input = ctx.conversation.input.for(scope)
+        const accepted = input.addAttachments([draftId])
         if (accepted) {
           setCachedDraft(captureId, { captureId, sessionId: targetSessionId, draftId, mountedAt: Date.now() })
           pendingRetry = null
@@ -253,12 +253,12 @@ export function applyWindowsClient(ctx: AppshotClientCtx) {
     // 2. 双重活性验证（防假 ACK）
     const cached = getCachedDraft(captureId)
     if (cached && cached.sessionId === targetSessionId) {
-      const binding = ctx.sessions.binding(targetSessionId)
-      if (binding) {
-        const shell = ctx.conversation.input.for(binding.ctx) as unknown as { snapshot?: { imageIds?: readonly string[] } }
-        const imageIds = shell.snapshot?.imageIds ?? []
-        const activeDrafts = ctx.conversation.draftImages([cached.draftId])
-        if (imageIds.includes(cached.draftId) && activeDrafts.length === 1) {
+      const scope = ctx.sessions.scope(targetSessionId)
+      if (scope !== undefined) {
+        const shell = ctx.conversation.input.for(scope)
+        const attachmentIds = shell.snapshot.attachmentIds
+        const activeDrafts = ctx.conversation.resolveDraftAttachments([cached.draftId])
+        if (attachmentIds.includes(cached.draftId) && activeDrafts.length === 1) {
           // 双重验证均通过，安全补发 ACK
           await sendDeliveryResult(captureId, targetSessionId, 'MOUNTED')
           return
@@ -269,8 +269,8 @@ export function applyWindowsClient(ctx: AppshotClientCtx) {
     }
 
     // 3. 解析目标 Session Binding
-    const binding = ctx.sessions.binding(targetSessionId)
-    if (!binding) {
+    const scope = ctx.sessions.scope(targetSessionId)
+    if (scope === undefined) {
       // 原目标 Session 已删除/改绑：标记待认领（REBIND_REQUIRED），仅允许显式 claim 改绑
       pendingClaims.set(captureId, { captureId, draftId: null })
       await sendDeliveryResult(captureId, targetSessionId, 'SESSION_MISMATCH')
@@ -282,11 +282,11 @@ export function applyWindowsClient(ctx: AppshotClientCtx) {
       const bytes = Uint8Array.from(atob(dataBase64), (c) => c.charCodeAt(0))
       const fileName = `${frame.metadata?.appName ?? 'appshot'}.png`
       const file = new File([bytes], fileName, { type: 'image/png' })
-      const [draft] = ctx.conversation.createDraftImages([file])
+      const [draft] = ctx.conversation.createDrafts(targetSessionId, [file])
       if (!draft) return
 
-      const input = ctx.conversation.input.for(binding.ctx)
-      const accepted = input.addImages([draft.id])
+      const input = ctx.conversation.input.for(scope)
+      const accepted = input.addAttachments([draft.id])
       if (accepted) {
         setCachedDraft(captureId, { captureId, sessionId: targetSessionId, draftId: draft.id, mountedAt: Date.now() })
         await sendDeliveryResult(captureId, targetSessionId, 'MOUNTED')
@@ -306,12 +306,12 @@ export function applyWindowsClient(ctx: AppshotClientCtx) {
       if (retryTimer) clearTimeout(retryTimer)
       const { targetSessionId, draftId } = pendingRetry
       pendingRetry = null
-      const binding = ctx.sessions.binding(targetSessionId)
-      if (binding) {
+      const scope = ctx.sessions.scope(targetSessionId)
+      if (scope !== undefined) {
         try {
-          const input = ctx.conversation.input.for(binding.ctx) as unknown as { removeImage?(id: string): void }
-          input.removeImage?.(draftId)
-          ctx.conversation.releaseDraftImage(draftId)
+          const input = ctx.conversation.input.for(scope)
+          input.removeAttachment(draftId)
+          ctx.conversation.releaseDraftAttachment(draftId)
         } catch {
           // ignore
         }
